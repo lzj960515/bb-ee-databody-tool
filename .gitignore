@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.spec
+research/
+tmp/
+DataBodyToolBackups/
+*.bak
+*.log
