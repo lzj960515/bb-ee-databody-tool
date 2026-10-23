@@ -55,7 +55,13 @@ jobs:
             "$hash  $name"
           }
           [IO.File]::WriteAllText((Join-Path $PWD 'release-assets/SHA256SUMS.txt'), (($hashes -join "`n") + "`n"), [Text.UTF8Encoding]::new($false))
-          $notes = git for-each-ref '--format=%(contents)' "refs/tags/$env:RELEASE_TAG"
+          # checkout 可能让本地标签直接指向提交；重新获取附注标签才能读取版本说明。
+          $releaseTagRef = "refs/tags/$env:RELEASE_TAG"
+          git fetch --force --no-tags origin "${releaseTagRef}:${releaseTagRef}"
+          if ($LASTEXITCODE -ne 0) { throw '读取远端版本标签失败' }
+          $tagType = git cat-file -t $releaseTagRef
+          if ($LASTEXITCODE -ne 0 -or $tagType -ne 'tag') { throw '发布需要含说明的附注版本标签' }
+          $notes = git for-each-ref '--format=%(contents)' $releaseTagRef
           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($notes -join "`n"))) { throw '版本标签缺少发布说明' }
           [IO.File]::WriteAllText((Join-Path $PWD 'release-notes.md'), (($notes -join "`n") + "`n"), [Text.UTF8Encoding]::new($false))
           gh release create $env:RELEASE_TAG --verify-tag --title "$env:RELEASE_TAG · 数据体工具" --notes-file release-notes.md --latest release-assets/bb-ee-databody-tool.exe release-assets/bb-ee-databody-tool-portable.zip release-assets/README.zh-CN.md release-assets/SHA256SUMS.txt
