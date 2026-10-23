@@ -44,8 +44,11 @@ jobs:
           New-Item -ItemType Directory -Path release-assets | Out-Null
           Copy-Item -LiteralPath 'dist/数据体工具.exe' -Destination 'release-assets/bb-ee-databody-tool.exe'
           $readme = [IO.File]::ReadAllText((Join-Path $PWD 'dist/使用说明.md'))
-          $screenshotUrl = "https://raw.githubusercontent.com/${{ github.repository }}/$env:RELEASE_TAG/docs/images/build-planner.png"
-          [IO.File]::WriteAllText((Join-Path $PWD 'release-assets/README.zh-CN.md'), $readme.Replace('](docs/images/build-planner.png)', "]($screenshotUrl)"), [Text.UTF8Encoding]::new($false))
+          foreach ($imageName in @('build-planner.png','custom-build.png')) {
+            $screenshotUrl = "https://raw.githubusercontent.com/${{ github.repository }}/$env:RELEASE_TAG/docs/images/$imageName"
+            $readme = $readme.Replace("](docs/images/$imageName)", "]($screenshotUrl)")
+          }
+          [IO.File]::WriteAllText((Join-Path $PWD 'release-assets/README.zh-CN.md'), $readme, [Text.UTF8Encoding]::new($false))
           Compress-Archive -LiteralPath 'dist/数据体工具.exe','dist/使用说明.md','dist/docs' -DestinationPath 'release-assets/bb-ee-databody-tool-portable.zip'
           $hashes = foreach ($name in @('bb-ee-databody-tool.exe','bb-ee-databody-tool-portable.zip','README.zh-CN.md')) {
             $hash = (Get-FileHash -LiteralPath "release-assets/$name" -Algorithm SHA256).Hash.ToLowerInvariant()

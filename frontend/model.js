@@ -1,13 +1,53 @@
-/* 只记录用户的编辑选择；推荐配置不会写进继承槽。 */
+/* 界面编辑状态与搭配请求生命周期；推荐配置不会写进继承槽。 */
 (function (root) {
   "use strict";
+  const copy = (value) => JSON.parse(JSON.stringify(value));
+  class GuideRequestQueue {
+    constructor(calculate) {
+      this.calculate = calculate;
+      this.revision = 0;
+      this.running = false;
+      this.pending = null;
+    }
+    invalidate() {
+      this.revision++;
+      if (this.pending) this.pending.resolve(null);
+      this.pending = null;
+    }
+    request(input) {
+      this.invalidate();
+      return new Promise((resolve, reject) => {
+        this.pending = { input, resolve, reject, revision: this.revision };
+        this.runNext();
+      });
+    }
+    async runNext() {
+      if (this.running || !this.pending) return;
+      const request = this.pending;
+      this.pending = null;
+      this.running = true;
+      try {
+        const result = await this.calculate(request.input);
+        request.resolve(request.revision === this.revision ? result : null);
+      } catch (error) {
+        if (request.revision === this.revision) request.reject(error);
+        else request.resolve(null);
+      } finally {
+        // 慢计算期间只保留最新草稿，避免每次点击都启动一次过期计算。
+        this.running = false;
+        this.runNext();
+      }
+    }
+  }
   class BodyEditor {
-    constructor(count) {
-      this.bodies = Array.from({ length: count }, () => ({
-        character_id: null,
-        body_quality: 3,
-        slots: [null, null],
-      }));
+    constructor(count, bodies = null) {
+      this.bodies = bodies
+        ? copy(bodies)
+        : Array.from({ length: count }, () => ({
+            character_id: null,
+            body_quality: 3,
+            slots: [null, null],
+          }));
     }
     strategyIds() {
       return this.bodies.flatMap((body) =>
@@ -61,7 +101,96 @@
       }));
     }
   }
+  class StrategyPickerModel {
+    constructor(strategies, recommendedIds = []) {
+      this.strategies = strategies;
+      this.recommended = new Set(recommendedIds);
+      this.query = "";
+      this.element = "全部";
+      this.selected = null;
+      this.quality = 4;
+    }
+    visible() {
+      const query = this.query.trim().toLowerCase();
+      return this.strategies
+        .filter(
+          (row) =>
+            (this.element === "全部" || row.category.includes(this.element)) &&
+            `${row.name} ${row.description} ${row.category}`
+              .toLowerCase()
+              .includes(query),
+        )
+        .sort(
+          (left, right) =>
+            Number(this.recommended.has(right.id)) -
+            Number(this.recommended.has(left.id)),
+        );
+    }
+  }
+  class CustomBuildDraft {
+    constructor(document = {}, saved = false) {
+      this.id = document.id || null;
+      this.title = document.title || "";
+      this.targetIds = [...(document.target_ids || [])];
+      this.preferredIds = [...(document.preferred_ids || [])];
+      this.requiredInherited = [...(document.required_inherited || [])];
+      this.editor = new BodyEditor(2, document.bodies);
+      this.savedSnapshot = saved ? JSON.stringify(this.document()) : null;
+    }
+    static fromGuide(guide, editor) {
+      return new CustomBuildDraft({
+        ...guide.definition,
+        title: `${guide.title}（自定义）`,
+        bodies: editor.bodies,
+      });
+    }
+    get dirty() {
+      return JSON.stringify(this.document()) !== this.savedSnapshot;
+    }
+    addTarget(id) {
+      if (!this.targetIds.includes(id)) this.targetIds.push(id);
+    }
+    removeTarget(id) {
+      this.targetIds = this.targetIds.filter((value) => value !== id);
+      this.preferredIds = this.preferredIds.filter((value) => value !== id);
+      this.requiredInherited = this.requiredInherited.filter(
+        (value) => value !== id,
+      );
+    }
+    document() {
+      return {
+        id: this.id,
+        title: this.title,
+        target_ids: [...this.targetIds],
+        preferred_ids: [...this.preferredIds],
+        required_inherited: [...this.requiredInherited],
+        bodies: copy(this.editor.bodies),
+      };
+    }
+    forSave() {
+      if (!this.title.trim()) throw new Error("请填写玩法名称。");
+      return { ...this.document(), title: this.title.trim() };
+    }
+    acknowledgeSave(document) {
+      // 保存响应只更新已保存快照，保留等待响应期间的编辑。
+      this.id = document.id;
+      this.savedSnapshot = JSON.stringify(
+        new CustomBuildDraft(document).document(),
+      );
+    }
+  }
   if (typeof module !== "undefined" && module.exports)
-    module.exports = { BodyEditor };
-  else root.DataBodyModel = { BodyEditor };
+    module.exports = {
+      BodyEditor,
+      CustomBuildDraft,
+      GuideRequestQueue,
+      StrategyPickerModel,
+    };
+  else
+    root.DataBodyModel = {
+      BodyEditor,
+      CustomBuildDraft,
+      GuideRequestQueue,
+      StrategyPickerModel,
+    };
 })(globalThis);

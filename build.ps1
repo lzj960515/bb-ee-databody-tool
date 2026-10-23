@@ -7,3 +7,4 @@ if ($LASTEXITCODE -ne 0) { throw '打包失败' }
 Copy-Item -LiteralPath '.\README.md' -Destination '.\dist\使用说明.md' -Force
 New-Item -ItemType Directory -Path '.\dist\docs\images' -Force | Out-Null
 Copy-Item -LiteralPath '.\docs\images\build-planner.png' -Destination '.\dist\docs\images\build-planner.png' -Force
+Copy-Item -LiteralPath '.\docs\images\custom-build.png' -Destination '.\dist\docs\images\custom-build.png' -Force

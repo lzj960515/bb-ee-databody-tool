@@ -6,11 +6,24 @@
 from __future__ import annotations
 
 from itertools import combinations
+from time import monotonic
 
-from .planner_types import Activation, BuildDefinition, BuildPlan, RouteStep
+from .planner_types import Activation, BuildDefinition, RouteSearchExpired
 
 
 TRIGGER_NAMES = {1: '普攻', 2: '技能', 3: '冲刺', 4: '传承技', 5: '召唤'}
+ROUTE_SEARCH_SECONDS = 1.5
+
+
+class _RouteSearch:
+    """一次交互的搜索状态，完成或超时后整体释放，不污染下一次编辑。"""
+    def __init__(self):
+        self.deadline = monotonic() + ROUTE_SEARCH_SECONDS
+        self.failed: set[tuple[frozenset[int], frozenset[int]]] = set()
+
+    def check_time(self) -> None:
+        if monotonic() >= self.deadline:
+            raise RouteSearchExpired()
 
 
 class BuildPlanner:
@@ -36,12 +49,6 @@ class BuildPlanner:
                 upgrades=tuple(row.get('upgrades', [])), notes=tuple(row.get('notes', [])),
                 required_inherited=tuple(row.get('required_inherited', [])),
             ))
-        for strategy in self.strategies.values():
-            if strategy['is_combined']:
-                builds.append(BuildDefinition(
-                    f"strategy-{strategy['id']}", strategy['name'], strategy['description'],
-                    (strategy['id'],),
-                ))
         return tuple(builds)
 
     def name(self, strategy_id: int) -> str:
@@ -91,7 +98,7 @@ class BuildPlanner:
         return Activation(tuple(active), frozenset(labels), tuple(missing), self._conflicts(inherited))
 
     def _validate_ids(self, ids: tuple[int, ...]) -> None:
-        if any(strategy_id not in self.strategies for strategy_id in ids):
+        if any(type(strategy_id) is not int or strategy_id not in self.strategies for strategy_id in ids):
             raise ValueError('路线含当前目录不存在的策略')
 
     def _candidate_key(self, strategy_id: int, preferred: tuple[int, ...]) -> tuple:
@@ -192,7 +199,9 @@ class BuildPlanner:
         return progress
 
     def _obtain_options(self, strategy_id: int, inherited: tuple[int, ...], acquired: tuple[int, ...],
-                        visiting: frozenset[int] = frozenset(), preferred: tuple[int, ...] = ()):
+                        visiting: frozenset[int] = frozenset(), preferred: tuple[int, ...] = (),
+                        *, search: _RouteSearch):
+        search.check_time()
         if strategy_id in visiting:
             return
         current = self._activate(inherited, acquired)
@@ -215,26 +224,23 @@ class BuildPlanner:
                     bases = [c for c in self.strategies if self.rules[c]['faction'] == faction
                              and self.strategies[c]['gradation'] == 1]
                     for base in sorted(bases, key=lambda c: self._candidate_key(c, preferred)):
-                        for state in self._obtain_options(base, inherited, acquired, visiting | {strategy_id}, preferred):
-                            yield from self._obtain_options(strategy_id, inherited, state, visiting, preferred)
+                        for state in self._obtain_options(base, inherited, acquired, visiting | {strategy_id}, preferred,
+                                                         search=search):
+                            yield from self._obtain_options(strategy_id, inherited, state, visiting, preferred,
+                                                            search=search)
                     return
         missing = [label for label in requirements if label not in current.labels]
         if missing:
             candidates = sorted(self.providers.get(missing[0], ()), key=lambda c: self._candidate_key(c, preferred))
             for candidate in candidates:
-                for state in self._obtain_options(candidate, inherited, acquired, visiting | {strategy_id}, preferred):
-                    yield from self._obtain_options(strategy_id, inherited, state, visiting, preferred)
+                for state in self._obtain_options(candidate, inherited, acquired, visiting | {strategy_id}, preferred,
+                                                 search=search):
+                    yield from self._obtain_options(strategy_id, inherited, state, visiting, preferred, search=search)
             return
         if strategy_id in inherited:
             yield acquired
         elif self.can_draw(strategy_id, inherited, acquired):
             yield (*acquired, strategy_id)
-
-    def _growth_targets(self, inherited: tuple[int, ...]) -> tuple[int, ...]:
-        active = self.evaluate_start(inherited).active_ids
-        factions = {self.rules[c]['faction'] for c in active if self.rules[c]['trigger_group']}
-        return tuple(c for c in self.strategies if self.strategies[c]['gradation'] == 3
-                     and self.rules[c]['faction'] in factions)
 
     def complete_route(self, required: tuple[int, ...], inherited: tuple[int, ...],
                        preferred: tuple[int, ...] = ()) -> tuple[int, ...] | None:
@@ -242,44 +248,24 @@ class BuildPlanner:
         self._validate_ids((*required, *inherited))
         if self._conflicts(inherited):
             return None
-        return next(self._route_options(required, inherited, (), preferred), None)
+        return next(self._route_options(tuple(dict.fromkeys(required)), inherited, (), preferred, _RouteSearch()), None)
 
     def _route_options(self, remaining: tuple[int, ...], inherited: tuple[int, ...],
-                       acquired: tuple[int, ...], preferred: tuple[int, ...]):
+                       acquired: tuple[int, ...], preferred: tuple[int, ...], search: _RouteSearch):
+        search.check_time()
+        active = set(self._activate(inherited, acquired).active_ids)
+        remaining = tuple(goal for goal in remaining if goal not in active)
         if not remaining:
             yield acquired
             return
-        for state in self._obtain_options(remaining[0], inherited, acquired, preferred=preferred):
-            yield from self._route_options(remaining[1:], inherited, state, preferred)
-
-    def plan(self, build_id: str, *, starting_ids: tuple[int, ...] | None = None,
-             targets: tuple[int, ...] | None = None) -> BuildPlan:
-        build = self.build_by_id[build_id]
-        goals = tuple(dict.fromkeys(targets if targets is not None else build.targets))
-        self._validate_ids(goals)
-        if starting_ids is None:
-            starters = build.required_inherited or self.recommend_start(goals, build.starters)
-        else:
-            starters = tuple(starting_ids)
-        activation = self.evaluate_start(starters)
-        errors = list(activation.conflicts)
-        if len(starters) > 4:
-            errors.append('两个数据体最多继承四项策略')
-        steps: list[RouteStep] = []
-        acquired: tuple[int, ...] = ()
-        if not errors:
-            required = tuple(dict.fromkeys((*goals, *(c for c, _ in activation.missing_labels))))
-            route = self.complete_route(required, starters, build.starters)
-            if route is None:
-                errors.append('当前继承搭配无法补齐这套玩法，请调整继承策略')
-            else:
-                acquired = route
-                steps.extend(RouteStep(c, '补齐成型') for c in acquired)
-            growth = build.upgrades or self._growth_targets(starters)
-            for goal in growth:
-                route = next(self._obtain_options(goal, starters, acquired, preferred=build.starters), None)
-                if route is not None:
-                    steps.extend(RouteStep(c, '后续强化') for c in route[len(acquired):])
-                    acquired = route
-        return BuildPlan(build, goals, starters, activation, tuple(steps),
-                         tuple(dict.fromkeys(errors)), build.notes)
+        # 当前目录的前置只来自更低阶策略；相同取得集合的激活结果与历史排列无关。
+        # 返回路线仍保留真实取得顺序，仅合并重复的失败搜索状态。
+        key = (frozenset(remaining), frozenset(acquired))
+        if key in search.failed:
+            return
+        # 目标是最终想要的策略，不是点击顺序。受阻时可先取得其他目标，延后激活继承红。
+        for index, goal in enumerate(remaining):
+            following = remaining[:index] + remaining[index + 1:]
+            for state in self._obtain_options(goal, inherited, acquired, preferred=preferred, search=search):
+                yield from self._route_options(following, inherited, state, preferred, search)
+        search.failed.add(key)

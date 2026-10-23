@@ -1,6 +1,66 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { BodyEditor } = require("../frontend/model.js");
+const {
+  BodyEditor,
+  CustomBuildDraft,
+  GuideRequestQueue,
+  StrategyPickerModel,
+} = require("../frontend/model.js");
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+test("搭配计算期间合并后续编辑，只返回最新草稿的结果", async () => {
+  const computations = [];
+  const queue = new GuideRequestQueue((input) => {
+    const response = deferred();
+    computations.push({ input, ...response });
+    return response.promise;
+  });
+  const first = queue.request([1, 2]);
+  const superseded = queue.request([1]);
+  const latest = queue.request([3]);
+  assert.equal(await superseded, null);
+  assert.deepEqual(
+    computations.map((entry) => entry.input),
+    [[1, 2]],
+  );
+  computations[0].resolve("旧搭配");
+  assert.equal(await first, null);
+  assert.deepEqual(
+    computations.map((entry) => entry.input),
+    [[1, 2], [3]],
+  );
+  computations[1].resolve("最新搭配");
+  assert.equal(await latest, "最新搭配");
+});
+
+test("返回或切换玩法后丢弃旧计算与错误，新计算仍可执行", async () => {
+  const computations = [];
+  const queue = new GuideRequestQueue(() => {
+    const response = deferred();
+    computations.push(response);
+    return response.promise;
+  });
+  const first = queue.request("旧玩法");
+  const pending = queue.request("已离开的草稿");
+  queue.invalidate();
+  assert.equal(await pending, null);
+  const next = queue.request("新玩法");
+  computations[0].reject(new Error("旧计算失败"));
+  assert.equal(await first, null);
+  computations[1].reject(new Error("当前计算失败"));
+  await assert.rejects(next, /当前计算失败/);
+  const retry = queue.request("修改后重算");
+  computations[2].resolve("可用搭配");
+  assert.equal(await retry, "可用搭配");
+});
 
 test("玩法初始四槽为空，两数据体的角色颜色相互独立", () => {
   const editor = new BodyEditor(2);
@@ -53,4 +113,105 @@ test("单体编辑状态与流派编辑相互隔离，替换只改变指定槽",
   single.set(0, 1, 3543, 3);
   assert.deepEqual(single.strategyIds(), [2115, 3543]);
   assert.deepEqual(pair.strategyIds(), []);
+});
+
+test("推荐只影响排序，完整目录可搜索，任一所属元素均可筛选", () => {
+  const rows = [
+    { id: 1, name: "普攻火焰", description: "燃烧", category: "火系" },
+    {
+      id: 2,
+      name: "冰霜脉冲",
+      description: "寒气",
+      category: "冰系/电系",
+      is_combined: true,
+    },
+    { id: 3, name: "技能风暴", description: "风暴", category: "刃系" },
+  ];
+  const picker = new StrategyPickerModel(rows, [3]);
+  assert.deepEqual(
+    picker.visible().map((row) => row.id),
+    [3, 1, 2],
+  );
+  picker.query = "冰霜";
+  assert.deepEqual(
+    picker.visible().map((row) => row.id),
+    [2],
+  );
+  picker.element = "电系";
+  assert.deepEqual(
+    picker.visible().map((row) => row.id),
+    [2],
+  );
+  assert.equal(picker.selected, null);
+  picker.selected = 2;
+  picker.element = "火系";
+  assert.deepEqual(picker.visible(), []);
+  assert.equal(picker.selected, 2);
+});
+
+test("自定义复制模板和继承配置，编辑与原模板隔离，完整目标不受四槽限制", () => {
+  const source = new BodyEditor(2);
+  source.add(3277, 4);
+  const guide = {
+    title: "斩杀风暴",
+    definition: {
+      target_ids: [3277],
+      preferred_ids: [3236],
+      required_inherited: [3277],
+    },
+  };
+  const draft = CustomBuildDraft.fromGuide(guide, source);
+  for (const id of [1, 2, 3, 4, 5]) draft.addTarget(id);
+  draft.editor.remove(0, 0);
+  assert.equal(draft.targetIds.length, 6);
+  assert.deepEqual(source.strategyIds(), [3277]);
+  draft.removeTarget(3277);
+  assert.deepEqual(draft.document().required_inherited, []);
+  assert.deepEqual(guide.definition.required_inherited, [3277]);
+});
+
+test("命名玩法可保存未完成草稿，保存标识与后续编辑状态独立", () => {
+  const draft = new CustomBuildDraft();
+  assert.equal(draft.dirty, true);
+  assert.throws(() => draft.forSave(), /名称/);
+  draft.title = "我的火环";
+  draft.addTarget(2470);
+  const sent = draft.forSave();
+  assert.deepEqual(
+    sent.bodies.map((body) => body.slots),
+    [
+      [null, null],
+      [null, null],
+    ],
+  );
+  draft.title = "修改中的火环";
+  draft.acknowledgeSave({ ...sent, id: "saved-1" });
+  assert.equal(draft.id, "saved-1");
+  assert.equal(draft.title, "修改中的火环");
+  assert.equal(draft.dirty, true);
+  draft.acknowledgeSave(draft.forSave());
+  assert.equal(draft.dirty, false);
+  draft.editor.bodies[1].body_quality = 4;
+  assert.equal(draft.dirty, true);
+});
+
+test("载入保存的玩法后修改不会污染保存快照，再次保存可完整还原", () => {
+  const document = {
+    id: "a",
+    title: "火环",
+    target_ids: [2470],
+    preferred_ids: [],
+    required_inherited: [],
+    bodies: new BodyEditor(2).bodies,
+  };
+  const draft = new CustomBuildDraft(document, true);
+  assert.equal(draft.dirty, false);
+  draft.editor.add(2470, 3);
+  draft.editor.bodies[0].character_id = 100101;
+  draft.editor.bodies[0].body_quality = 4;
+  assert.deepEqual(document.bodies[0].slots, [null, null]);
+  const reloaded = new CustomBuildDraft(draft.forSave(), true);
+  assert.deepEqual(reloaded.editor.strategyIds(), [2470]);
+  assert.equal(reloaded.editor.bodies[0].body_quality, 4);
+  assert.equal(reloaded.dirty, false);
 });

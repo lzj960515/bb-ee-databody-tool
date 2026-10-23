@@ -1,7 +1,12 @@
 /* 本地桌面界面；游戏规则与存档事务由 Python 负责。 */
 (function () {
   "use strict";
-  const { BodyEditor } = globalThis.DataBodyModel;
+  const {
+    BodyEditor,
+    CustomBuildDraft,
+    GuideRequestQueue,
+    StrategyPickerModel,
+  } = globalThis.DataBodyModel;
   const elements = [
     "全部",
     "火系",
@@ -29,10 +34,15 @@
     mode: "build",
     buildId: null,
     guide: null,
+    guideError: null,
     builds: [],
     catalog: null,
     strategies: new Map(),
     drafts: new Map(),
+    customDrafts: new Map(),
+    customId: null,
+    customQuery: "",
+    nextDraftId: 1,
     single: new BodyEditor(1),
     element: "全部",
     query: "",
@@ -40,10 +50,12 @@
     save: null,
     selectedPath: null,
     busy: false,
-    guideRevision: 0,
     picker: null,
     confirm: null,
   };
+  const guideRequests = new GuideRequestQueue(({ method, args }) =>
+    call(method, ...args),
+  );
   let toastTimer;
   const clean = (value) =>
     String(value ?? "").replace(/<\/?(?:color|size|b|i|u)(?:=[^>]*)?>/gi, "");
@@ -69,9 +81,15 @@
     return state.strategies.get(Number(id));
   }
   function editor() {
-    return state.mode === "single"
-      ? state.single
-      : state.drafts.get(state.buildId);
+    if (state.mode === "single") return state.single;
+    if (state.mode === "custom") return customDraft().editor;
+    return state.drafts.get(state.buildId);
+  }
+  function customDraft() {
+    return state.customDrafts.get(state.customId);
+  }
+  function activeBuildKey() {
+    return state.mode === "custom" ? state.customId : state.buildId;
   }
   function name(id) {
     return strategy(id)?.name || "未选择";
@@ -110,7 +128,8 @@
         button.classList.toggle("active", button.dataset.mode === state.mode),
       );
     if (state.mode === "single") renderSingle();
-    else if (state.buildId && state.guide) renderDetail();
+    else if (activeBuildKey()) renderDetail();
+    else if (state.mode === "custom") renderCustomLibrary();
     else renderLibrary();
   }
   function renderLibrary() {
@@ -137,44 +156,243 @@
   }
   async function openBuild(id) {
     if (!state.drafts.has(id)) state.drafts.set(id, new BodyEditor(2));
+    state.mode = "build";
     state.buildId = id;
-    const revision = ++state.guideRevision;
-    const guide = await call(
-      "describe_build",
-      id,
-      state.drafts.get(id).strategyIds(),
-    );
-    if (revision !== state.guideRevision || state.buildId !== id) return;
-    state.guide = guide;
+    state.guide = null;
+    state.guideError = null;
     render();
+    await refreshGuide();
   }
-  function strategyCard(id, suggested = false) {
+  function renderCustomLibrary() {
+    workspace.innerHTML = `<section class="library"><div class="library-heading"><h1>自定义玩法</h1><div class="library-actions"><input class="search" id="custom-search" aria-label="搜索自定义玩法" placeholder="搜索我的玩法" value="${escape(state.customQuery)}"><button class="primary" data-action="new-custom">新建玩法</button></div></div><div class="build-grid" id="custom-grid"></div></section>`;
+    renderCustomList();
+  }
+  function renderCustomList() {
+    const query = state.customQuery.trim().toLowerCase();
+    const visible = [...state.customDrafts.entries()].filter(([, draft]) =>
+      `${draft.title} ${draft.targetIds.map(name).join(" ")}`
+        .toLowerCase()
+        .includes(query),
+    );
+    document.querySelector("#custom-grid").innerHTML = visible.length
+      ? visible
+          .map(
+            ([key, draft]) =>
+              `<button class="build-card custom-build-card" data-action="open-custom" data-id="${escape(key)}"><div class="custom-card-heading"><h2>${escape(draft.title || "未命名玩法")}</h2><span class="draft-state ${draft.dirty ? "unsaved" : ""}">${draftStatus(draft)}</span></div><p>${escape(draft.targetIds.map(name).join("、") || "尚未选择目标策略")}</p><div class="build-tags"><span class="muted small">${draft.targetIds.length} 项目标 · ${draft.editor.strategyIds().length} 项继承</span><span class="enter-mark" aria-hidden="true">›</span></div></button>`,
+          )
+          .join("")
+      : `<div class="empty-result">${query ? "没有找到这个玩法。" : "从空白开始，或在流派玩法中选择“自定义”。"}</div>`;
+  }
+  function draftStatus(draft) {
+    return draft.dirty ? (draft.id ? "有未保存修改" : "未保存") : "已保存";
+  }
+  function updateDraftStatus() {
+    const node = document.querySelector("#draft-status");
+    if (!node || state.mode !== "custom") return;
+    node.textContent = draftStatus(customDraft());
+    node.classList.toggle("unsaved", customDraft().dirty);
+  }
+  function refreshCustomSaveControls(draft) {
+    if (state.mode !== "custom") return;
+    if (!state.customId) {
+      renderCustomList();
+      return;
+    }
+    if (customDraft() !== draft) return;
+    updateDraftStatus();
+    const saveButton = workspace.querySelector('[data-action="save-custom"]');
+    const deleteButton = workspace.querySelector(
+      '[data-action="confirm-delete-custom"]',
+    );
+    if (saveButton) {
+      saveButton.disabled = Boolean(draft.saving);
+      saveButton.textContent = draft.saving ? "保存中…" : "保存玩法";
+    }
+    if (deleteButton) deleteButton.disabled = Boolean(draft.saving);
+  }
+  async function openCustom(key) {
+    state.mode = "custom";
+    state.customId = key;
+    state.guide = null;
+    state.guideError = null;
+    render();
+    await refreshGuide();
+  }
+  async function createCustom(fromCurrent = false) {
+    const draft = fromCurrent
+      ? CustomBuildDraft.fromGuide(state.guide, editor())
+      : new CustomBuildDraft();
+    const key = `draft-${state.nextDraftId++}`;
+    state.customDrafts.set(key, draft);
+    await openCustom(key);
+  }
+  async function saveCustom() {
+    const draft = customDraft();
+    if (draft.saving) return;
+    draft.title = draft.title.trim();
+    const document = draft.forSave();
+    draft.saving = true;
+    refreshCustomSaveControls(draft);
+    try {
+      const saved = await call("save_custom_build", document);
+      draft.acknowledgeSave(saved);
+      toast("玩法已保存。");
+    } finally {
+      draft.saving = false;
+      refreshCustomSaveControls(draft);
+    }
+  }
+  function confirmDeleteCustom() {
+    if (customDraft().saving) return;
+    showModal(
+      "删除玩法",
+      `<p>删除“${escape(customDraft().title || "未命名玩法")}”？</p>`,
+      '<button class="secondary" data-action="close-modal">取消</button><button class="danger-button" data-action="delete-custom">删除</button>',
+    );
+  }
+  async function deleteCustom() {
+    const draft = customDraft(),
+      key = state.customId;
+    setBusy(true);
+    try {
+      if (draft.id) await call("delete_custom_build", draft.id);
+      state.customDrafts.delete(key);
+      state.customId = null;
+      state.guide = null;
+      guideRequests.invalidate();
+      closeModal();
+      render();
+      toast("玩法已删除。");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function currentGuideRequest() {
+    return state.mode === "custom"
+      ? { method: "describe_custom_build", args: [customDraft().document()] }
+      : {
+          method: "describe_build",
+          args: [state.buildId, editor().strategyIds()],
+        };
+  }
+  function describeCurrentBuild() {
+    const { method, args } = currentGuideRequest();
+    return call(method, ...args);
+  }
+  function renderDetailPreservingPosition() {
+    const scrollTop = document.querySelector(".detail-scroll")?.scrollTop || 0;
+    const title =
+      document.activeElement?.id === "custom-title"
+        ? document.activeElement
+        : null;
+    const selection = title && [title.selectionStart, title.selectionEnd];
+    render();
+    document.querySelector(".detail-scroll").scrollTop = scrollTop;
+    if (selection) {
+      const input = document.querySelector("#custom-title");
+      input.focus({ preventScroll: true });
+      input.setSelectionRange(...selection);
+    }
+  }
+  async function refreshGuide() {
+    state.guide = null;
+    state.guideError = null;
+    // 草稿先显示，路线后计算；旧路线不代表刚刚修改的搭配。
+    renderDetailPreservingPosition();
+    try {
+      const guide = await guideRequests.request(currentGuideRequest());
+      if (!guide) return;
+      state.guide = guide;
+    } catch (error) {
+      state.guideError = error.message;
+    }
+    renderDetailPreservingPosition();
+  }
+  function combinedBadge(row) {
+    return row?.is_combined ? '<span class="tier combined">双重</span>' : "";
+  }
+  function strategyCard(id, suggested = false, optional = false) {
     const row = strategy(id);
     if (!row) return "";
     const selected = Boolean(editor().locate(id));
     const required = state.guide.required_inherited?.includes(id);
-    return `<article class="strategy-card ${selected ? "selected" : ""}" data-strategy="${id}" style="--element-color:${elementColor(row.category)}"><div class="strategy-title"><h3>${escape(row.name)}</h3><span class="tier ${row.is_combined ? "combined" : ""}">${tiers[row.gradation]}</span></div><div class="strategy-card-actions"><button data-action="inspect" data-id="${id}" aria-label="查看${escape(row.name)}效果">效果</button><span class="suggested">${required ? "需继承" : suggested ? "推荐" : ""}</span><button data-action="${selected ? "unpick" : "pick"}" data-id="${id}">${selected ? "移出" : "继承"}</button></div></article>`;
+    const assumed = state.guide.assumed_inherited_ids?.includes(id);
+    const source = selected
+      ? "继承"
+      : assumed
+        ? "待选继承"
+        : optional
+          ? "可选强化"
+          : state.guide.selection.errors.length
+            ? "目标策略"
+            : "局内取得";
+    return `<article class="strategy-card ${selected ? "selected" : ""}" data-strategy="${id}" style="--element-color:${elementColor(row.category)}"><div class="strategy-title"><h3>${escape(row.name)}</h3>${row.is_combined ? combinedBadge(row) : `<span class="tier">${tiers[row.gradation] || "策略"}</span>`}</div><div class="strategy-source ${selected ? "inherited" : assumed ? "pending" : ""}">${source}${required ? " · 需继承" : ""}</div><div class="strategy-card-actions"><button data-action="inspect" data-id="${id}" aria-label="查看${escape(row.name)}效果">效果</button><span class="suggested">${suggested ? "推荐" : ""}</span><button data-action="${selected ? "unpick" : "pick"}" data-id="${id}">${selected ? "移出继承" : "继承"}</button></div></article>`;
+  }
+  function detailHeadingHtml() {
+    if (state.mode !== "custom") {
+      const build =
+        state.guide || state.builds.find((row) => row.id === state.buildId);
+      return `<div class="detail-heading"><button class="back-button" data-action="back">‹ 返回</button><div class="detail-title"><h1>${escape(build.title)}</h1><p>${escape(build.summary)}</p></div><button class="secondary" data-action="copy-custom" ${state.guide ? "" : "disabled"}>自定义</button></div>`;
+    }
+    const draft = customDraft();
+    return `<div class="detail-heading custom-heading"><button class="back-button" data-action="back">‹ 返回</button><div class="detail-title"><input id="custom-title" class="build-title-input" aria-label="玩法名称" placeholder="玩法名称" maxlength="80" value="${escape(draft.title)}"><span id="draft-status" class="draft-state ${draft.dirty ? "unsaved" : ""}">${draftStatus(draft)}</span></div><div class="detail-actions"><button class="quiet-button" data-action="confirm-delete-custom" ${draft.saving ? "disabled" : ""}>删除</button><button class="primary" data-action="save-custom" ${draft.saving ? "disabled" : ""}>${draft.saving ? "保存中…" : "保存玩法"}</button></div></div>`;
+  }
+  function targetEditorHtml() {
+    if (state.mode !== "custom") return "";
+    const targets = customDraft().targetIds;
+    return `<section class="target-editor"><div class="section-heading"><h2>目标策略</h2><button class="secondary" data-action="add-target">＋ 添加策略</button></div><div class="target-list">${targets.length ? targets.map((id) => `<div class="target-chip"><button class="target-name" data-action="inspect" data-id="${id}">${escape(name(id))}${combinedBadge(strategy(id))}</button><button class="target-remove" data-action="remove-target" data-id="${id}" aria-label="移除目标${escape(name(id))}">×</button></div>`).join("") : '<p class="muted small">选择想要的策略，再从下方决定四项继承。</p>'}</div></section>`;
+  }
+  function buildMapHtml() {
+    const guide = state.guide,
+      suggested = new Set(guide.suggested_ids);
+    const lanes = guide.lanes
+      .map(
+        (lane) =>
+          `<section class="lane"><div class="lane-header"><span>${escape(lane.label)}</span><span class="lane-index">${lane.strategies.length ? `${lane.strategies.length} 项` : ""}</span></div><div class="lane-cards">${lane.strategies.length ? lane.strategies.map((id) => strategyCard(id, suggested.has(id))).join("") : '<div class="lane-empty">空闲</div>'}</div></section>`,
+      )
+      .join("");
+    const others = guide.other_strategy_ids.length
+      ? `<div class="extra-strategies">${guide.other_strategy_ids.map((id) => strategyCard(id, suggested.has(id))).join("")}</div>`
+      : "";
+    return `<div class="section-heading"><h2>${guide.selection.errors.length ? "当前搭配" : "最终搭配"}</h2><span class="muted">按当前继承选择计算</span></div><div class="lanes">${lanes}</div>${others}`;
+  }
+  function optionalHtml() {
+    const optional = state.guide.optional_ids || [];
+    if (!optional.length) return "";
+    return `<section class="optional-section"><div class="section-heading"><h2>可选强化</h2></div><div class="extra-strategies">${optional.map((id) => strategyCard(id, false, true)).join("")}</div></section>`;
+  }
+  function computedGuideHtml() {
+    const guide = state.guide;
+    if (!guide)
+      return `<div class="guide-computation ${state.guideError ? "error" : "muted"}" role="status">${escape(state.guideError || "正在计算搭配…")}</div>`;
+    return `${guide.chain.length ? `<div class="effect-chain">${guide.chain.map((text) => `<span class="chain-link">${escape(text)}</span>`).join('<span class="chain-arrow" aria-hidden="true">→</span>')}</div>` : ""}${buildMapHtml()}${guide.notes.length ? `<div class="guide-notes">${guide.notes.map((note) => `<p>${escape(note)}</p>`).join("")}</div>` : ""}<section class="route-section" id="route-section">${routeHtml()}</section>${optionalHtml()}`;
   }
   function renderDetail() {
-    const guide = state.guide;
-    const suggested = new Set(guide.suggested_ids);
-    workspace.innerHTML = `<section class="detail"><div class="detail-scroll"><div class="detail-content"><div class="detail-heading"><button class="back-button" data-action="back">‹ 返回</button><div><h1>${escape(guide.title)}</h1><p>${escape(guide.summary)}</p></div></div>${guide.chain.length ? `<div class="effect-chain">${guide.chain.map((text) => `<span class="chain-link">${escape(text)}</span>`).join('<span class="chain-arrow" aria-hidden="true">→</span>')}</div>` : ""}<div class="section-heading"><h2>最终搭配</h2><span class="muted">从下方选择四项继承</span></div><div class="lanes">${guide.lanes.map((lane) => `<section class="lane"><div class="lane-header"><span>${escape(lane.label)}</span><span class="lane-index">${lane.strategies.length ? `${lane.strategies.length} 项` : ""}</span></div><div class="lane-cards">${lane.strategies.length ? lane.strategies.map((id) => strategyCard(id, suggested.has(id))).join("") : '<div class="lane-empty">不限定</div>'}</div></section>`).join("")}</div>${guide.other_strategy_ids.length ? `<div class="extra-strategies">${guide.other_strategy_ids.map((id) => strategyCard(id, suggested.has(id))).join("")}</div>` : ""}${guide.notes.length ? `<div class="guide-notes">${guide.notes.map((note) => `<p>${escape(note)}</p>`).join("")}</div>` : ""}<section class="route-section" id="route-section">${routeHtml()}</section></div></div><aside class="inheritance-dock"><div class="dock-inner"><div class="body-pair" id="body-editors">${bodyEditorHtml(0)}${bodyEditorHtml(1)}</div><div class="dock-footer"><div id="selection-feedback" class="feedback">${feedbackHtml()}</div><span class="selection-count" id="selection-count">已选 ${editor().strategyIds().length} / 4</span><button class="primary" data-action="save" ${state.busy ? "disabled" : ""}>添加两个数据体</button></div></div></aside></section>`;
+    workspace.innerHTML = `<section class="detail"><div class="detail-scroll"><div class="detail-content">${detailHeadingHtml()}${targetEditorHtml()}${computedGuideHtml()}</div></div><aside class="inheritance-dock"><div class="dock-inner"><div class="body-pair" id="body-editors">${bodyEditorHtml(0)}${bodyEditorHtml(1)}</div><div class="dock-footer"><div id="selection-feedback" class="feedback">${feedbackHtml()}</div><span class="selection-count" id="selection-count">已选 ${editor().strategyIds().length} / 4</span><button class="primary" data-action="save" ${state.busy || !state.guide ? "disabled" : ""}>添加两个数据体</button></div></div></aside></section>`;
     applyFeedbackStyle();
   }
   function routeHtml() {
     const guide = state.guide,
       selected = editor().strategyIds();
+    if (
+      state.mode === "custom" &&
+      !customDraft().targetIds.length &&
+      !selected.length
+    )
+      return '<h2>局内怎么拿</h2><p class="route-intro">添加目标策略后生成路线。</p>';
     if (guide.selection.errors.length)
       return `<h2>局内怎么拿</h2><p class="feedback error">${escape([...new Set(guide.selection.errors)].join("；"))}</p>`;
     const lines = guide.steps
       .map(
         (step) =>
-          `<div class="route-item"><div><strong>${escape(name(step.strategy_id))}</strong><p>${escape(strategy(step.strategy_id)?.description)}</p></div></div>`,
+          `<div class="route-item"><div><strong>${escape(name(step.strategy_id))}</strong>${combinedBadge(strategy(step.strategy_id))}<p>${escape(strategy(step.strategy_id)?.description)}</p></div></div>`,
       )
       .join("");
-    const introduction = selected.length
-      ? "已带出的策略从路线中省去，其余按下面顺序补齐。"
-      : "下面是完整获取顺序。选入继承后，会自动省去可以跳过的步骤。";
+    const introduction = guide.assumed_inherited_ids?.length
+      ? `先继承${guide.assumed_inherited_ids.map(name).join("、")}，再按下面顺序补齐。`
+      : selected.length
+        ? "按下面顺序补齐，已继承的策略和省去的前置不再重复获取。"
+        : "选入继承后，路线会省去可以跳过的步骤。";
     return `<h2>局内怎么拿</h2><p class="route-intro">${guide.steps.length ? introduction : selected.length ? "目标策略已齐，可以在局内提升品质。" : "此玩法没有额外的获取步骤。"}</p>${lines ? `<div class="route-list">${lines}</div>` : ""}`;
   }
   function bodyEditorHtml(index) {
@@ -194,9 +412,13 @@
             (item) => item.quality === slot.quality,
           ).description
         : "";
-    return `<div class="body-slot ${slot ? "filled" : ""}">${slot ? "" : '<span class="slot-add" aria-hidden="true">＋</span>'}<button class="slot-main" data-action="slot" data-body="${bodyIndex}" data-slot="${slotIndex}"><strong>${slot ? escape(name(slot.id)) : `选择策略${slotIndex === 0 ? "一" : "二"}`}</strong><span>${slot ? `${qualityNames[slot.quality]}策略` : "点击选择"}</span>${description ? `<p class="slot-description">${escape(description)}</p>` : ""}</button>${slot ? `<button class="slot-remove" data-action="remove" data-body="${bodyIndex}" data-slot="${slotIndex}" aria-label="移除${escape(name(slot.id))}">×</button>` : ""}</div>`;
+    return `<div class="body-slot ${slot ? "filled" : ""}">${slot ? "" : '<span class="slot-add" aria-hidden="true">＋</span>'}<button class="slot-main" data-action="slot" data-body="${bodyIndex}" data-slot="${slotIndex}"><strong>${slot ? escape(name(slot.id)) : `选择策略${slotIndex === 0 ? "一" : "二"}`}</strong><span class="slot-meta">${slot ? `${qualityNames[slot.quality]}策略 ${combinedBadge(strategy(slot.id))}` : "点击选择"}</span>${description ? `<p class="slot-description">${escape(description)}</p>` : ""}</button>${slot ? `<button class="slot-remove" data-action="remove" data-body="${bodyIndex}" data-slot="${slotIndex}" aria-label="移除${escape(name(slot.id))}">×</button>` : ""}</div>`;
   }
   function feedbackHtml() {
+    if (!state.guide)
+      return state.guideError
+        ? "搭配计算未完成，请调整策略。"
+        : "正在计算搭配…";
     const selection = state.guide.selection;
     const errors = [
       ...(selection.conflicts || []),
@@ -212,7 +434,7 @@
   }
   function applyFeedbackStyle() {
     const node = document.querySelector("#selection-feedback");
-    if (!node) return;
+    if (!node || !state.guide) return;
     const selection = state.guide.selection;
     node.classList.toggle(
       "error",
@@ -226,36 +448,11 @@
     );
   }
   async function selectionChanged() {
-    refreshEditors();
-    if (state.mode === "single") return;
-    const buildId = state.buildId,
-      revision = ++state.guideRevision;
-    const guide = await call("describe_build", buildId, editor().strategyIds());
-    if (revision !== state.guideRevision || state.buildId !== buildId) return;
-    state.guide = guide;
-    if (state.mode !== "build") return;
-    document.querySelector("#route-section").innerHTML = routeHtml();
-    document.querySelector("#selection-feedback").innerHTML = feedbackHtml();
-    applyFeedbackStyle();
-    document.querySelectorAll(".strategy-card").forEach((card) => {
-      const picked = Boolean(editor().locate(Number(card.dataset.strategy)));
-      card.classList.toggle("selected", picked);
-      const button = card.querySelector(
-        "[data-action=pick],[data-action=unpick]",
-      );
-      button.dataset.action = picked ? "unpick" : "pick";
-      button.textContent = picked ? "移出" : "继承";
-    });
-  }
-  function refreshEditors() {
     if (state.mode === "single") {
       renderSingle();
       return;
     }
-    document.querySelector("#body-editors").innerHTML =
-      bodyEditorHtml(0) + bodyEditorHtml(1);
-    document.querySelector("#selection-count").textContent =
-      `已选 ${editor().strategyIds().length} / 4`;
+    await refreshGuide();
   }
   function renderSingle() {
     workspace.innerHTML = `<section class="single-page"><div class="single-layout"><h1>单个数据体</h1><div class="single-form">${bodyEditorHtml(0)}<div class="dock-footer"><span class="feedback"></span><button class="primary" data-action="save" ${state.busy ? "disabled" : ""}>添加数据体</button></div></div></div></section>`;
@@ -271,24 +468,34 @@
     state.picker = null;
     state.confirm = null;
   }
-  function openPicker(body, slot) {
-    const existing = editor().bodies[body].slots[slot];
-    const ids =
+  function openPicker(body, slot, purpose = "inheritance") {
+    const existing =
+      purpose === "target" ? null : editor().bodies[body].slots[slot];
+    const recommended =
       state.mode === "single"
-        ? state.catalog.strategies.map((row) => row.id)
-        : state.guide.strategy_ids;
-    state.picker = {
+        ? []
+        : state.guide?.suggested_ids ||
+          state.guide?.strategy_ids ||
+          customDraft()?.targetIds ||
+          [];
+    const picker = new StrategyPickerModel(
+      state.catalog.strategies,
+      recommended,
+    );
+    Object.assign(picker, {
       body,
       slot,
-      ids,
+      purpose,
       selected: existing?.id || null,
       quality: existing?.quality || 4,
-      query: "",
-    };
+    });
+    state.picker = picker;
     showModal(
-      `选择策略${slot === 0 ? "一" : "二"}`,
-      `<div class="picker-controls"><input id="strategy-search" placeholder="搜索策略" aria-label="搜索策略"><span class="muted small">${ids.length} 项</span></div><div class="picker-layout"><div class="picker-list" id="picker-list"></div><section class="picker-detail" id="picker-detail"></section></div>`,
-      `<button class="secondary" data-action="close-modal">取消</button><button class="primary" id="picker-save" data-action="picker-save">保存选择</button>`,
+      purpose === "target"
+        ? "添加目标策略"
+        : `选择策略${slot === 0 ? "一" : "二"}`,
+      `<div class="picker-controls"><input id="strategy-search" placeholder="搜索策略名称或效果" aria-label="搜索策略"><select id="picker-element" aria-label="策略元素">${elements.map((element) => `<option>${element}</option>`).join("")}</select><span class="muted small" id="picker-count"></span></div><div class="picker-layout"><div class="picker-list" id="picker-list"></div><section class="picker-detail" id="picker-detail"></section></div>`,
+      `<button class="secondary" data-action="close-modal">取消</button><button class="primary" id="picker-save" data-action="picker-save">${purpose === "target" ? "加入搭配" : "保存选择"}</button>`,
     );
     renderPickerList();
     renderPickerDetail();
@@ -300,9 +507,9 @@
       ? editor().bodies[existing[0]].slots[existing[1]]
       : null;
     state.picker = {
+      purpose: "inheritance",
       body: existing?.[0],
       slot: existing?.[1],
-      ids: [id],
       selected: id,
       quality: current?.quality || 4,
       query: "",
@@ -317,27 +524,24 @@
   }
   function renderPickerList() {
     const picker = state.picker,
-      query = picker.query.trim().toLowerCase();
-    const visible = picker.ids
-      .map(strategy)
-      .filter(
-        (row) =>
-          row &&
-          `${row.name} ${row.description} ${row.category}`
-            .toLowerCase()
-            .includes(query),
-      );
+      visible = picker.visible();
+    document.querySelector("#picker-count").textContent =
+      `${visible.length} 项`;
     document.querySelector("#picker-list").innerHTML =
       visible
         .map(
           (row) =>
-            `<button class="picker-row ${row.id === picker.selected ? "active" : ""}" data-action="picker-row" data-id="${row.id}"><span>${escape(row.name)}</span><span>${escape(row.category)}</span></button>`,
+            `<button class="picker-row ${row.id === picker.selected ? "active" : ""}" data-action="picker-row" data-id="${row.id}"><span class="picker-row-main"><span class="picker-name">${escape(row.name)}${combinedBadge(row)}</span><span class="picker-category">${escape(row.category)}</span></span><span class="picker-row-mark">${picker.recommended.has(row.id) ? '<span class="recommended-badge">推荐</span>' : ""}${picker.purpose === "target" ? (customDraft().targetIds.includes(row.id) ? '<span class="picked-badge">已加入</span>' : "") : editor().locate(row.id) ? '<span class="picked-badge">已继承</span>' : ""}</span></button>`,
         )
         .join("") || '<div class="empty-result">没有找到这个策略。</div>';
   }
   function renderPickerDetail() {
     const picker = state.picker;
-    document.querySelector("#picker-save").disabled = !picker.selected;
+    const existingTarget =
+      picker.purpose === "target" &&
+      customDraft().targetIds.includes(picker.selected);
+    document.querySelector("#picker-save").disabled =
+      !picker.selected || existingTarget;
     const row = strategy(picker.selected);
     if (!row) {
       document.querySelector("#picker-detail").innerHTML =
@@ -357,7 +561,7 @@
       )
       .filter(Boolean);
     document.querySelector("#picker-detail").innerHTML =
-      `<h3>${escape(row.name)}</h3>${tags([row.category])}<p>${escape(detail.description)}</p><div class="quality-row"><label for="picker-quality">策略品质</label><select id="picker-quality">${row.qualities.map((quality) => `<option value="${quality}" ${quality === picker.quality ? "selected" : ""}>${qualityNames[quality]}</option>`).join("")}</select></div>${prerequisites.length ? `<div class="strategy-prerequisites">生效需要：${escape(prerequisites.join(" ＋ "))}</div>` : ""}`;
+      `<div class="picker-detail-heading"><h3>${escape(row.name)}</h3>${combinedBadge(row)}</div>${tags([row.category])}${picker.recommended?.has(row.id) ? '<span class="recommended-badge">推荐</span>' : ""}<p>${escape(detail.description)}</p>${picker.purpose !== "target" ? `<div class="quality-row"><label for="picker-quality">策略品质</label><select id="picker-quality">${row.qualities.map((quality) => `<option value="${quality}" ${quality === picker.quality ? "selected" : ""}>${qualityNames[quality]}</option>`).join("")}</select></div>` : ""}${prerequisites.length ? `<div class="strategy-prerequisites">生效需要：${escape(prerequisites.join(" ＋ "))}</div>` : ""}`;
   }
   async function chooseSave(path) {
     if (state.busy) return;
@@ -454,14 +658,18 @@
     if (state.busy) return;
     const requests = editor().requests();
     if (!state.save) throw new Error("请先在右上角选择存档。");
-    if (state.mode === "build") {
-      const guide = await call(
-        "describe_build",
-        state.buildId,
-        editor().strategyIds(),
-      );
-      const errors = [...guide.selection.conflicts, ...guide.selection.errors];
-      if (errors.length) throw new Error([...new Set(errors)].join("；"));
+    if (state.mode !== "single") {
+      setBusy(true);
+      try {
+        const guide = await describeCurrentBuild();
+        const errors = [
+          ...guide.selection.conflicts,
+          ...guide.selection.errors,
+        ];
+        if (errors.length) throw new Error([...new Set(errors)].join("；"));
+      } finally {
+        setBusy(false);
+      }
     }
     state.confirm = { requests, path: state.save.path };
     const rows = requests
@@ -521,16 +729,32 @@
     if (state.busy && action !== "close-modal") return;
     if (action === "mode") {
       state.mode = button.dataset.mode;
+      state.guide = null;
+      state.guideError = null;
+      guideRequests.invalidate();
       render();
+      if (state.mode !== "single" && activeBuildKey()) await refreshGuide();
     } else if (action === "element") {
       state.element = button.dataset.value;
       renderLibrary();
     } else if (action === "open-build") await openBuild(button.dataset.id);
-    else if (action === "back") {
-      state.buildId = null;
+    else if (action === "open-custom") await openCustom(button.dataset.id);
+    else if (action === "new-custom") await createCustom();
+    else if (action === "copy-custom") await createCustom(true);
+    else if (action === "save-custom") await saveCustom();
+    else if (action === "confirm-delete-custom") confirmDeleteCustom();
+    else if (action === "delete-custom") await deleteCustom();
+    else if (action === "add-target")
+      openPicker(undefined, undefined, "target");
+    else if (action === "remove-target") {
+      customDraft().removeTarget(Number(button.dataset.id));
+      await refreshGuide();
+    } else if (action === "back") {
+      if (state.mode === "custom") state.customId = null;
+      else state.buildId = null;
       state.guide = null;
-      ++state.guideRevision;
-      renderLibrary();
+      guideRequests.invalidate();
+      render();
     } else if (action === "pick") {
       const row = strategy(button.dataset.id);
       editor().add(row.id, Math.max(...row.qualities));
@@ -553,7 +777,8 @@
       renderPickerDetail();
     } else if (action === "picker-save") {
       const picker = state.picker;
-      if (picker.body === undefined)
+      if (picker.purpose === "target") customDraft().addTarget(picker.selected);
+      else if (picker.body === undefined)
         editor().add(picker.selected, picker.quality);
       else
         editor().set(picker.body, picker.slot, picker.selected, picker.quality);
@@ -574,6 +799,12 @@
     if (event.target.id === "build-search") {
       state.query = event.target.value;
       renderBuildList();
+    } else if (event.target.id === "custom-search") {
+      state.customQuery = event.target.value;
+      renderCustomList();
+    } else if (event.target.id === "custom-title") {
+      customDraft().title = event.target.value;
+      updateDraftStatus();
     } else if (event.target.id === "strategy-search") {
       state.picker.query = event.target.value;
       renderPickerList();
@@ -582,17 +813,22 @@
   });
   document.addEventListener("change", (event) => {
     const field = event.target.dataset.field;
-    if (field === "character")
+    if (field === "character") {
       editor().bodies[Number(event.target.dataset.body)].character_id =
         Number(event.target.value) || null;
-    else if (field === "color") {
+      updateDraftStatus();
+    } else if (field === "color") {
       editor().bodies[Number(event.target.dataset.body)].body_quality = Number(
         event.target.value,
       );
       event.target.classList.toggle("gold", Number(event.target.value) === 4);
+      updateDraftStatus();
     } else if (event.target.id === "picker-quality") {
       state.picker.quality = Number(event.target.value);
       renderPickerDetail();
+    } else if (event.target.id === "picker-element") {
+      state.picker.element = event.target.value;
+      renderPickerList();
     } else if (event.target.id === "save-select") {
       if (event.target.value)
         chooseSave(event.target.value).catch((error) =>
@@ -623,6 +859,13 @@
         state.catalog.strategies.map((row) => [row.id, row]),
       );
       state.builds = await call("list_builds");
+      const customBuilds = await call("list_custom_builds");
+      state.customDrafts = new Map(
+        customBuilds.map((document) => [
+          `saved-${document.id}`,
+          new CustomBuildDraft(document, true),
+        ]),
+      );
       state.saves = await call("discover_saves");
       updateSaveLabel();
       render();

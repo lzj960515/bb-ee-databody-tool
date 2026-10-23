@@ -1,7 +1,9 @@
 """网页桌面桥与真实存档服务的受控集成测试。"""
 import json
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -34,7 +36,9 @@ class DesktopAPITests(unittest.TestCase):
         running.start()
         self.addCleanup(running.stop)
         self.window = Mock()
-        self.api = DesktopAPI(self.service, resource_directory=self.root)
+        self.personal_directory = self.root / "personal"
+        self.api = DesktopAPI(self.service, resource_directory=self.root,
+                              user_data_directory=self.personal_directory)
         self.api._window = self.window
 
     def requests(self):
@@ -46,6 +50,86 @@ class DesktopAPITests(unittest.TestCase):
     def assert_unchanged(self, expected=None):
         self.assertEqual(self.path.read_bytes(), self.original if expected is None else expected)
         self.assertFalse((self.root / "DataBodyToolBackups").exists())
+
+    def custom_draft(self):
+        return {
+            "id": None, "title": "我的搭配", "target_ids": [2227],
+            "preferred_ids": [2226], "required_inherited": [],
+            "bodies": [
+                {"character_id": 101101, "body_quality": 3,
+                 "slots": [{"id": 2113, "quality": 4}, None]},
+                {"character_id": None, "body_quality": 4, "slots": [None, None]},
+            ],
+        }
+
+    def test_custom_draft_round_trip_does_not_change_templates_or_game_save(self):
+        templates = (self.root / "data" / "builds.json").read_bytes()
+        self.assertEqual(self.api.list_custom_builds(), {"ok": True, "data": []})
+        result = self.api.save_custom_build(self.custom_draft())
+        self.assertTrue(result["ok"], result)
+        saved = result["data"]
+        restarted = DesktopAPI(self.service, resource_directory=self.root,
+                               user_data_directory=self.personal_directory)
+        self.assertEqual(restarted.list_custom_builds(), {"ok": True, "data": [saved]})
+        self.assertEqual(restarted.delete_custom_build(saved["id"]), {"ok": True, "data": saved["id"]})
+        self.assertEqual(self.api.list_custom_builds(), {"ok": True, "data": []})
+        self.assertEqual((self.root / "data" / "builds.json").read_bytes(), templates)
+        self.assertFalse(self.api.save_bodies(self.requests())["ok"])
+        self.assert_unchanged()
+
+    def test_custom_draft_can_be_saved_when_route_has_unresolved_conditions(self):
+        document = self.custom_draft()
+        document["required_inherited"] = [2227]
+        document["bodies"][1]["character_id"] = 101101
+        with patch.object(self.api, "_get_guides", side_effect=AssertionError("保存草稿不计算路线")):
+            result = self.api.save_custom_build(document)
+        self.assertTrue(result["ok"], result)
+        self.assert_unchanged()
+
+    def test_slow_planning_does_not_block_saving_personal_draft(self):
+        started, finish = threading.Event(), threading.Event()
+
+        def slow_description(*args):
+            started.set()
+            finish.wait(3)
+            return {'steps': []}
+
+        guides = Mock()
+        guides.describe_custom.side_effect = slow_description
+        with patch.object(self.api, '_get_guides', return_value=guides), ThreadPoolExecutor(2) as executor:
+            planning = executor.submit(self.api.describe_custom_build, self.custom_draft())
+            try:
+                self.assertTrue(started.wait(1))
+                saved = executor.submit(self.api.save_custom_build, self.custom_draft()).result(timeout=.5)
+                self.assertTrue(saved['ok'], saved)
+                self.assertFalse(planning.done())
+                self.assert_unchanged()
+            finally:
+                finish.set()
+            self.assertTrue(planning.result(timeout=1)['ok'])
+
+    def test_custom_description_uses_draft_slots_without_writing_personal_or_game_data(self):
+        document = self.custom_draft()
+        document["title"] = ""
+        document["bodies"][1]["slots"][1] = {"id": 2226, "quality": 3}
+        guides = Mock()
+        guides.describe_custom.return_value = {"title": "自定义玩法", "warnings": []}
+        with patch.object(self.api, "_get_guides", return_value=guides):
+            result = self.api.describe_custom_build(document)
+        self.assertEqual(result, {"ok": True, "data": guides.describe_custom.return_value})
+        guides.describe_custom.assert_called_once_with(document, [2113, 2226])
+        self.assertFalse(self.personal_directory.exists())
+        self.assert_unchanged()
+
+    def test_invalid_custom_draft_returns_error_without_changing_saved_draft(self):
+        saved = self.api.save_custom_build(self.custom_draft())["data"]
+        invalid = self.custom_draft()
+        invalid["bodies"][0]["slots"][0]["id"] = 999999
+        self.assertFalse(self.api.save_custom_build(invalid)["ok"])
+        self.assertFalse(self.api.describe_custom_build(invalid)["ok"])
+        self.assertFalse(self.api.delete_custom_build(True)["ok"])
+        self.assertEqual(self.api.list_custom_builds()["data"], [saved])
+        self.assert_unchanged()
 
     def test_initial_data_and_discovery_do_not_load_a_save(self):
         initial = self.api.get_initial_data()

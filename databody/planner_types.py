@@ -2,6 +2,10 @@
 from dataclasses import dataclass
 
 
+class RouteSearchExpired(RuntimeError):
+    """交互时间内尚未穷尽路线，不表示目标无解。"""
+
+
 @dataclass(frozen=True)
 class BuildDefinition:
     id: str
@@ -21,20 +25,3 @@ class Activation:
     labels: frozenset[int]
     missing_labels: tuple[tuple[int, tuple[int, ...]], ...]
     conflicts: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class RouteStep:
-    strategy_id: int
-    purpose: str
-
-
-@dataclass(frozen=True)
-class BuildPlan:
-    build: BuildDefinition
-    targets: tuple[int, ...]
-    starting_ids: tuple[int, ...]
-    activation: Activation
-    steps: tuple[RouteStep, ...]
-    errors: tuple[str, ...]
-    notes: tuple[str, ...]

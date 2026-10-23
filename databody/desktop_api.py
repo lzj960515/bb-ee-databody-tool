@@ -6,14 +6,17 @@ import threading
 from pathlib import Path
 
 from .body_types import BodyRequest
+from .custom_builds import CustomBuildStore
 from .planner import BuildPlanner
 from .service import DataBodyService, application_directory
 
 
 class DesktopAPI:
-    def __init__(self, service: DataBodyService | None = None, *, resource_directory: Path | None = None):
+    def __init__(self, service: DataBodyService | None = None, *, resource_directory: Path | None = None,
+                 user_data_directory: Path | None = None):
         self._service = service or DataBodyService()
         self._resources = resource_directory or application_directory()
+        self._custom_builds = CustomBuildStore(self._service.catalog, directory=user_data_directory)
         self._window = None
         self._selected_path: Path | None = None
         self._current_save: dict | None = None
@@ -30,27 +33,43 @@ class DesktopAPI:
     def describe_build(self, build_id: str, inherited_ids: list[int] | None = None) -> dict:
         return self._respond(self._describe_build, build_id, inherited_ids)
 
+    def list_custom_builds(self) -> dict:
+        return self._respond_serialized(self._custom_builds.list_builds)
+
+    def save_custom_build(self, document: dict) -> dict:
+        return self._respond_serialized(self._custom_builds.save, document)
+
+    def delete_custom_build(self, build_id: str) -> dict:
+        return self._respond_serialized(self._custom_builds.delete, build_id)
+
+    def describe_custom_build(self, document: dict) -> dict:
+        return self._respond(self._describe_custom_build, document)
+
     def discover_saves(self) -> dict:
         return self._respond(self._service.discover_saves)
 
     def load_save(self, path: str) -> dict:
-        return self._respond(self._load_save, path)
+        return self._respond_serialized(self._load_save, path)
 
     def browse_save(self) -> dict:
-        return self._respond(self._browse_save)
+        return self._respond_serialized(self._browse_save)
 
     def save_bodies(self, requests: list[dict]) -> dict:
-        return self._respond(self._save_bodies, requests)
+        return self._respond_serialized(self._save_bodies, requests)
 
     def restore_backup(self) -> dict:
-        return self._respond(self._restore_backup)
+        return self._respond_serialized(self._restore_backup)
 
     def _respond(self, operation, *args) -> dict:
+        try:
+            return {"ok": True, "data": operation(*args)}
+        except Exception as error:
+            return {"ok": False, "error": str(error)}
+
+    def _respond_serialized(self, operation, *args) -> dict:
+        # 文件读写和游戏存档切换保持串行；只读规划不持此锁，避免阻塞草稿保存。
         with self._operation_lock:
-            try:
-                return {"ok": True, "data": operation(*args)}
-            except Exception as error:
-                return {"ok": False, "error": str(error)}
+            return self._respond(operation, *args)
 
     def _get_initial_data(self) -> dict:
         rules = self._read_data("planner_rules.json")
@@ -61,11 +80,12 @@ class DesktopAPI:
         return json.loads((self._resources / "data" / filename).read_text(encoding="utf-8"))
 
     def _get_guides(self):
-        if self._guides is None:
-            from .gameplay import GameplayGuideService
+        with self._operation_lock:
+            if self._guides is None:
+                from .gameplay import GameplayGuideService
 
-            data = self._get_initial_data()
-            self._guides = GameplayGuideService(data["catalog"], data["rules"], data["knowledge"])
+                data = self._get_initial_data()
+                self._guides = GameplayGuideService(data["catalog"], data["rules"], data["knowledge"])
         return self._guides
 
     def _list_builds(self) -> list[dict]:
@@ -78,6 +98,11 @@ class DesktopAPI:
         if any(type(strategy_id) is not int for strategy_id in inherited):
             raise ValueError("请选择有效策略")
         return self._get_guides().describe(build_id, inherited)
+
+    def _describe_custom_build(self, document: dict) -> dict:
+        definition = self._custom_builds.validate(document, require_title=False)
+        inherited = [slot["id"] for body in definition["bodies"] for slot in body["slots"] if slot is not None]
+        return self._get_guides().describe_custom(definition, inherited)
 
     def _load_save(self, path: str) -> dict:
         if not isinstance(path, str) or not path.strip():
