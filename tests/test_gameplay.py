@@ -47,6 +47,16 @@ class GameplayGuideTests(unittest.TestCase):
         inherited = self.service.describe('storm-fire', [2470, 2462])
         self.assertIn(2454, inherited['optional_ids'])
 
+    def test_picker_positions_follow_activation_source_and_include_alternative_slots(self):
+        positions = self.service.strategy_positions()
+        self.assertEqual(positions[2401], ['冲刺'])
+        self.assertEqual(positions[2474], ['传承技'])
+        self.assertEqual(positions[3277], ['普攻', '技能'])  # 斩杀风暴不占获取前置的传承技位。
+        self.assertEqual(positions[2253], ['普攻', '技能'])  # 冰霜脉冲跟随寒气爆发。
+        self.assertEqual(positions[2470], ['技能', '传承技'])  # 风暴火环跟随风暴，而非输出火环。
+        self.assertEqual(set(positions), set(self.service.planner.strategies))
+        self.assertTrue(all(positions.values()))
+
     def test_manual_selection_updates_map_and_route_from_the_same_requirements(self):
         empty = self.service.describe('storm-fire')
         selected = self.service.describe('storm-fire', [2470, 2462])

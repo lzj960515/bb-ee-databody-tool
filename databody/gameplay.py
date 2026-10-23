@@ -1,6 +1,7 @@
 """按玩家的最终目标和实际继承，生成同一份搭配图与局内路线。"""
 from __future__ import annotations
 
+from collections.abc import Iterator
 from itertools import combinations
 
 from .planner import BuildPlanner, TRIGGER_NAMES
@@ -13,6 +14,15 @@ class GameplayGuideService:
 
     def list_builds(self) -> list[dict]:
         return [self._build_summary(build) for build in self.planner.builds]
+
+    def strategy_positions(self) -> dict[int, list[str]]:
+        """选择列表展示所有可选占有位，具体搭配仍按实际基础策略归位。"""
+        candidates = tuple(self.planner.strategies)
+        positions = {}
+        for strategy_id in candidates:
+            sources = set(self._trigger_sources(strategy_id, candidates))
+            positions[strategy_id] = [label for trigger, label in TRIGGER_NAMES.items() if trigger in sources]
+        return positions
 
     def describe(self, build_id: str, inherited_ids=()) -> dict:
         build = self.planner.build_by_id.get(build_id)
@@ -126,22 +136,23 @@ class GameplayGuideService:
                  for trigger, label in TRIGGER_NAMES.items()], other)
 
     def _trigger_source(self, strategy_id: int, complete: tuple[int, ...]) -> int:
+        return next(self._trigger_sources(strategy_id, complete), 0)
+
+    def _trigger_sources(self, strategy_id: int, complete: tuple[int, ...]) -> Iterator[int]:
         rule = self.planner.rules[strategy_id]
         if rule['trigger_group']:
-            return rule['trigger_group']
+            yield rule['trigger_group']
+            return
         strategy = self.planner.strategies[strategy_id]
         if not strategy['true_pre']:
-            return 0
+            return
         # 双重的首个激活前置表示触发源；输出派系不决定它归属哪个动作位。
         source_label = strategy['true_pre'][0]
         providers = [candidate for candidate in complete
                      if source_label in self.planner.strategies[candidate]['labels']
                      and self.planner.strategies[candidate]['gradation'] < strategy['gradation']]
         for candidate in providers:
-            trigger = self._trigger_source(candidate, complete)
-            if trigger:
-                return trigger
-        return 0
+            yield from self._trigger_sources(candidate, complete)
 
     def _route_step(self, strategy_id: int, build: BuildDefinition) -> dict:
         if strategy_id in build.targets:

@@ -38,6 +38,7 @@
     builds: [],
     catalog: null,
     strategies: new Map(),
+    strategyPositions: {},
     drafts: new Map(),
     customDrafts: new Map(),
     customId: null,
@@ -531,7 +532,7 @@
       visible
         .map(
           (row) =>
-            `<button class="picker-row ${row.id === picker.selected ? "active" : ""}" data-action="picker-row" data-id="${row.id}"><span class="picker-row-main"><span class="picker-name">${escape(row.name)}${combinedBadge(row)}</span><span class="picker-category">${escape(row.category)}</span></span><span class="picker-row-mark">${picker.recommended.has(row.id) ? '<span class="recommended-badge">推荐</span>' : ""}${picker.purpose === "target" ? (customDraft().targetIds.includes(row.id) ? '<span class="picked-badge">已加入</span>' : "") : editor().locate(row.id) ? '<span class="picked-badge">已继承</span>' : ""}</span></button>`,
+            `<button class="picker-row ${row.id === picker.selected ? "active" : ""}" data-action="picker-row" data-id="${row.id}"><span class="picker-row-main"><span class="picker-name">${escape(row.name)}${combinedBadge(row)}</span><span class="picker-category">${escape(row.category)} · ${escape(state.strategyPositions[row.id].join("或"))}位</span></span><span class="picker-row-mark">${picker.recommended.has(row.id) ? '<span class="recommended-badge">推荐</span>' : ""}${picker.purpose === "target" ? (customDraft().targetIds.includes(row.id) ? '<span class="picked-badge">已加入</span>' : "") : editor().locate(row.id) ? '<span class="picked-badge">已继承</span>' : ""}</span></button>`,
         )
         .join("") || '<div class="empty-result">没有找到这个策略。</div>';
   }
@@ -855,6 +856,7 @@
     try {
       const initial = await call("get_initial_data");
       state.catalog = initial.catalog;
+      state.strategyPositions = initial.strategy_positions;
       state.strategies = new Map(
         state.catalog.strategies.map((row) => [row.id, row]),
       );

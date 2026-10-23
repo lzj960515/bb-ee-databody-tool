@@ -72,6 +72,11 @@ class DesktopAPI:
             return self._respond(operation, *args)
 
     def _get_initial_data(self) -> dict:
+        data = self._read_initial_data()
+        data["strategy_positions"] = self._get_guides().strategy_positions()
+        return data
+
+    def _read_initial_data(self) -> dict:
         rules = self._read_data("planner_rules.json")
         knowledge = self._read_data("builds.json")
         return {"catalog": self._service.catalog, "rules": rules, "knowledge": knowledge}
@@ -84,7 +89,7 @@ class DesktopAPI:
             if self._guides is None:
                 from .gameplay import GameplayGuideService
 
-                data = self._get_initial_data()
+                data = self._read_initial_data()
                 self._guides = GameplayGuideService(data["catalog"], data["rules"], data["knowledge"])
         return self._guides
 
@@ -152,7 +157,7 @@ class DesktopAPI:
     def _validate_pair(self, bodies: list[BodyRequest]) -> None:
         if bodies[0].character_id == bodies[1].character_id:
             raise ValueError("两个数据体请选择不同角色")
-        data = self._get_initial_data()
+        data = self._read_initial_data()
         planner = BuildPlanner(data["catalog"], data["rules"], data["knowledge"])
         strategy_ids = tuple(strategy_id for body in bodies for strategy_id in body.strategy_ids)
         activation = planner.evaluate_start(strategy_ids)
