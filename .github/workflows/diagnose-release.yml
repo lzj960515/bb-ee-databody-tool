@@ -3,34 +3,33 @@ on:
   push:
     branches: ['diagnostics/v1.2.0-release']
 permissions:
-  actions: read
   contents: read
 jobs:
   inspect:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
-      - name: Read failed build output
+      - uses: actions/checkout@v4
+        with:
+          ref: 73fc4c092656e9ead166af82ad2b80e45b62f6b8
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Replay previous test and build
         shell: python
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          import os, urllib.request, urllib.error
-          url = 'https://api.github.com/repos/lzj960515/bb-ee-databody-tool/actions/jobs/120236829535/logs'
-          request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'User-Agent': 'release-diagnostics'})
-          class NoRedirect(urllib.request.HTTPRedirectHandler):
-              def redirect_request(self, req, fp, code, msg, headers, newurl):
-                  return None
-          try:
-              try:
-                  response = urllib.request.build_opener(NoRedirect).open(request, timeout=60)
-              except urllib.error.HTTPError as redirect:
-                  if redirect.code != 302:
-                      raise
-                  response = urllib.request.urlopen(redirect.headers['Location'], timeout=60)
-              output = response.read().decode('utf-8', errors='replace')
-          except urllib.error.HTTPError as error:
-              output = str(error) + '\n' + error.read().decode('utf-8', errors='replace')
-          lines = output.splitlines()[-130:]
-          for offset in range(0, len(lines), 15):
-              chunk = '\n'.join(lines[offset:offset + 15]).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-              print(f'::notice title=Release log {offset}::{chunk}')
+          import subprocess, sys
+          commands = [
+              [sys.executable, '-m', 'venv', '.venv'],
+              [r'.venv\Scripts\python.exe', '-m', 'pip', 'install', '-r', 'requirements.txt', 'pyinstaller==6.16.0'],
+              [r'.venv\Scripts\python.exe', '-m', 'unittest', 'discover', '-s', 'tests', '-v'],
+              ['pwsh', '-File', 'build.ps1'],
+          ]
+          for index, command in enumerate(commands):
+              result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+              output = result.stdout.decode('utf-8', errors='replace')
+              lines = output.splitlines()[-80:]
+              for offset in range(0, len(lines), 15):
+                  chunk = '\n'.join(lines[offset:offset + 15]).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print(f'::notice title=Command {index} output {offset}::{chunk}')
+              if result.returncode:
+                  sys.exit(result.returncode)
