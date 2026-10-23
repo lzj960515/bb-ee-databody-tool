@@ -10,16 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Read failed build output
-        shell: pwsh
+        shell: python
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $lines = gh api repos/lzj960515/bb-ee-databody-tool/actions/jobs/120236829535/logs
-          if ($LASTEXITCODE -ne 0) { throw 'Failed to read build log' }
-          $tail = @($lines | Select-Object -Last 100)
-          for ($offset = 0; $offset -lt $tail.Count; $offset += 20) {
-            $text = ($tail | Select-Object -Skip $offset -First 20) -join "`n"
-            $escaped = $text.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
-            Write-Output "::notice title=Release log $offset::$escaped"
-          }
+          import os, urllib.request, urllib.error
+          url = 'https://api.github.com/repos/lzj960515/bb-ee-databody-tool/actions/jobs/120236829535/logs'
+          request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'User-Agent': 'release-diagnostics'})
+          try:
+              output = urllib.request.urlopen(request, timeout=60).read().decode('utf-8', errors='replace')
+          except urllib.error.HTTPError as error:
+              output = str(error) + '\n' + error.read().decode('utf-8', errors='replace')
+          lines = output.splitlines()[-130:]
+          for offset in range(0, len(lines), 15):
+              chunk = '\n'.join(lines[offset:offset + 15]).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print(f'::notice title=Release log {offset}::{chunk}')
