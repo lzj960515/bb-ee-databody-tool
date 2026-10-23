@@ -1,0 +1,1793 @@
+{
+  "schema_version": 1,
+  "source": {
+    "game_build": "25627491",
+    "checked_on": "2026-10-23",
+    "rules": "BlessConf, ModelBreedDungeon.getInheritBless, BlessGenerator.RefreshBlessActive / blessFilter",
+    "scope": "默认契约下的继承与局内获取；配置与脚本静态核验，未进行实战强度测试"
+  },
+  "strategies": [
+    {
+      "id": 2401,
+      "trigger_group": 3,
+      "faction": 101,
+      "second_faction": 0
+    },
+    {
+      "id": 2403,
+      "trigger_group": 1,
+      "faction": 101,
+      "second_faction": 0
+    },
+    {
+      "id": 2419,
+      "trigger_group": 2,
+      "faction": 104,
+      "second_faction": 0
+    },
+    {
+      "id": 2438,
+      "trigger_group": 2,
+      "faction": 101,
+      "second_faction": 0
+    },
+    {
+      "id": 2443,
+      "trigger_group": 5,
+      "faction": 105,
+      "second_faction": 0
+    },
+    {
+      "id": 2455,
+      "trigger_group": 1,
+      "faction": 103,
+      "second_faction": 0
+    },
+    {
+      "id": 2467,
+      "trigger_group": 4,
+      "faction": 104,
+      "second_faction": 0
+    },
+    {
+      "id": 2474,
+      "trigger_group": 4,
+      "faction": 106,
+      "second_faction": 0
+    },
+    {
+      "id": 2404,
+      "trigger_group": 0,
+      "faction": 101,
+      "second_faction": 0
+    },
+    {
+      "id": 2405,
+      "trigger_group": 0,
+      "faction": 101,
+      "second_faction": 0
+    },
+    {
+      "id": 2423,
+      "trigger_group": 0,
+      "faction": 104,
+      "second_faction": 0
+    },
+    {
+      "id": 2432,
+      "trigger_group": 0,
+      "faction": 104,
+      "second_faction": 0
+    },
+    {
+      "id": 2433,
+      "trigger_group": 0,
+      "faction": 104,
+      "second_faction": 0
+    },
+    {
+      "id": 2441,
+      "trigger_group": 0,
+      "faction": 101,
+      "second_faction": 0
+    },
+    {
+      "id": 2447,
+      "trigger_group": 0,
+      "faction": 105,
+      "second_faction": 0
+    },
+    {
+      "id": 2448,
+      "trigger_group": 0,
+      "faction": 105,
+      "second_faction": 0
+    },
+    {
+      "id": 2450,
+      "trigger_group": 0,
+      "faction": 106,
+      "second_faction": 0
+    },
+    {
+      "id": 2452,
+      "trigger_group": 0,
+      "faction": 106,
+      "second_faction": 0
+    },
+    {
+      "id": 2453,
+      "trigger_group": 0,
+      "faction": 106,
+      "second_faction": 0
+    },
+    {
+      "id": 2456,
+      "trigger_group": 0,
+      "faction": 103,
+      "second_faction": 0
+    },
+    {
+      "id": 2457,
+      "trigger_group": 0,
+      "faction": 103,
+      "second_faction": 0
+    },
+    {
+      "id": 2458,
+      "trigger_group": 0,
+      "faction": 103,
+      "second_faction": 0
+    },
+    {
+      "id": 2472,
+      "trigger_group": 0,
+      "faction": 105,
+      "second_faction": 0
+    },
+    {
+      "id": 2480,
+      "trigger_group": 0,
+      "faction": 101,
+      "second_faction": 0
+    },
+    {
+      "id": 2409,
+      "trigger_group": 0,
+      "faction": 101,
+      "second_faction": 0
+    },
+    {
+      "id": 2422,
+      "trigger_group": 0,
+      "faction": 104,
+      "second_faction": 0
+    },
+    {
+      "id": 2446,
+      "trigger_group": 0,
+      "faction": 105,
+      "second_faction": 0
+    },
+    {
+      "id": 2454,
+      "trigger_group": 0,
+      "faction": 106,
+      "second_faction": 0
+    },
+    {
+      "id": 2459,
+      "trigger_group": 0,
+      "faction": 103,
+      "second_faction": 0
+    },
+    {
+      "id": 2425,
+      "trigger_group": 0,
+      "faction": 104,
+      "second_faction": 101
+    },
+    {
+      "id": 2461,
+      "trigger_group": 0,
+      "faction": 103,
+      "second_faction": 101
+    },
+    {
+      "id": 2462,
+      "trigger_group": 0,
+      "faction": 101,
+      "second_faction": 106
+    },
+    {
+      "id": 2463,
+      "trigger_group": 0,
+      "faction": 103,
+      "second_faction": 104
+    },
+    {
+      "id": 2464,
+      "trigger_group": 0,
+      "faction": 105,
+      "second_faction": 101
+    },
+    {
+      "id": 2482,
+      "trigger_group": 0,
+      "faction": 104,
+      "second_faction": 101
+    },
+    {
+      "id": 2465,
+      "trigger_group": 0,
+      "faction": 103,
+      "second_faction": 301
+    },
+    {
+      "id": 2466,
+      "trigger_group": 0,
+      "faction": 104,
+      "second_faction": 301
+    },
+    {
+      "id": 2469,
+      "trigger_group": 0,
+      "faction": 105,
+      "second_faction": 604
+    },
+    {
+      "id": 2460,
+      "trigger_group": 0,
+      "faction": 101,
+      "second_faction": 703
+    },
+    {
+      "id": 2470,
+      "trigger_group": 0,
+      "faction": 106,
+      "second_faction": 704
+    },
+    {
+      "id": 2481,
+      "trigger_group": 0,
+      "faction": 106,
+      "second_faction": 702
+    },
+    {
+      "id": 2203,
+      "trigger_group": 1,
+      "faction": 201,
+      "second_faction": 0
+    },
+    {
+      "id": 2213,
+      "trigger_group": 3,
+      "faction": 202,
+      "second_faction": 0
+    },
+    {
+      "id": 2225,
+      "trigger_group": 5,
+      "faction": 203,
+      "second_faction": 0
+    },
+    {
+      "id": 2226,
+      "trigger_group": 2,
+      "faction": 201,
+      "second_faction": 0
+    },
+    {
+      "id": 2258,
+      "trigger_group": 4,
+      "faction": 202,
+      "second_faction": 0
+    },
+    {
+      "id": 2268,
+      "trigger_group": 2,
+      "faction": 204,
+      "second_faction": 0
+    },
+    {
+      "id": 2269,
+      "trigger_group": 4,
+      "faction": 204,
+      "second_faction": 0
+    },
+    {
+      "id": 2274,
+      "trigger_group": 1,
+      "faction": 205,
+      "second_faction": 0
+    },
+    {
+      "id": 2218,
+      "trigger_group": 0,
+      "faction": 202,
+      "second_faction": 0
+    },
+    {
+      "id": 2221,
+      "trigger_group": 0,
+      "faction": 203,
+      "second_faction": 0
+    },
+    {
+      "id": 2227,
+      "trigger_group": 0,
+      "faction": 201,
+      "second_faction": 0
+    },
+    {
+      "id": 2232,
+      "trigger_group": 0,
+      "faction": 203,
+      "second_faction": 0
+    },
+    {
+      "id": 2235,
+      "trigger_group": 0,
+      "faction": 201,
+      "second_faction": 0
+    },
+    {
+      "id": 2246,
+      "trigger_group": 0,
+      "faction": 202,
+      "second_faction": 0
+    },
+    {
+      "id": 2249,
+      "trigger_group": 0,
+      "faction": 203,
+      "second_faction": 0
+    },
+    {
+      "id": 2267,
+      "trigger_group": 0,
+      "faction": 202,
+      "second_faction": 0
+    },
+    {
+      "id": 2270,
+      "trigger_group": 0,
+      "faction": 204,
+      "second_faction": 0
+    },
+    {
+      "id": 2271,
+      "trigger_group": 0,
+      "faction": 204,
+      "second_faction": 0
+    },
+    {
+      "id": 2272,
+      "trigger_group": 0,
+      "faction": 204,
+      "second_faction": 0
+    },
+    {
+      "id": 2277,
+      "trigger_group": 0,
+      "faction": 205,
+      "second_faction": 0
+    },
+    {
+      "id": 2278,
+      "trigger_group": 0,
+      "faction": 205,
+      "second_faction": 0
+    },
+    {
+      "id": 2279,
+      "trigger_group": 0,
+      "faction": 205,
+      "second_faction": 0
+    },
+    {
+      "id": 2206,
+      "trigger_group": 0,
+      "faction": 201,
+      "second_faction": 0
+    },
+    {
+      "id": 2238,
+      "trigger_group": 0,
+      "faction": 202,
+      "second_faction": 0
+    },
+    {
+      "id": 2242,
+      "trigger_group": 0,
+      "faction": 203,
+      "second_faction": 0
+    },
+    {
+      "id": 2248,
+      "trigger_group": 0,
+      "faction": 201,
+      "second_faction": 0
+    },
+    {
+      "id": 2273,
+      "trigger_group": 0,
+      "faction": 204,
+      "second_faction": 0
+    },
+    {
+      "id": 2280,
+      "trigger_group": 0,
+      "faction": 205,
+      "second_faction": 0
+    },
+    {
+      "id": 2286,
+      "trigger_group": 0,
+      "faction": 204,
+      "second_faction": 105
+    },
+    {
+      "id": 2251,
+      "trigger_group": 0,
+      "faction": 202,
+      "second_faction": 201
+    },
+    {
+      "id": 2252,
+      "trigger_group": 0,
+      "faction": 203,
+      "second_faction": 201
+    },
+    {
+      "id": 2254,
+      "trigger_group": 0,
+      "faction": 203,
+      "second_faction": 201
+    },
+    {
+      "id": 2255,
+      "trigger_group": 0,
+      "faction": 201,
+      "second_faction": 202
+    },
+    {
+      "id": 2281,
+      "trigger_group": 0,
+      "faction": 202,
+      "second_faction": 204
+    },
+    {
+      "id": 2282,
+      "trigger_group": 0,
+      "faction": 203,
+      "second_faction": 204
+    },
+    {
+      "id": 2283,
+      "trigger_group": 0,
+      "faction": 201,
+      "second_faction": 205
+    },
+    {
+      "id": 2284,
+      "trigger_group": 0,
+      "faction": 205,
+      "second_faction": 201
+    },
+    {
+      "id": 2180,
+      "trigger_group": 0,
+      "faction": 204,
+      "second_faction": 301
+    },
+    {
+      "id": 2253,
+      "trigger_group": 0,
+      "faction": 201,
+      "second_faction": 302
+    },
+    {
+      "id": 2250,
+      "trigger_group": 0,
+      "faction": 201,
+      "second_faction": 406
+    },
+    {
+      "id": 2257,
+      "trigger_group": 0,
+      "faction": 203,
+      "second_faction": 504
+    },
+    {
+      "id": 2256,
+      "trigger_group": 0,
+      "faction": 202,
+      "second_faction": 603
+    },
+    {
+      "id": 2285,
+      "trigger_group": 0,
+      "faction": 204,
+      "second_faction": 602
+    },
+    {
+      "id": 2288,
+      "trigger_group": 0,
+      "faction": 205,
+      "second_faction": 605
+    },
+    {
+      "id": 2287,
+      "trigger_group": 0,
+      "faction": 205,
+      "second_faction": 703
+    },
+    {
+      "id": 2111,
+      "trigger_group": 2,
+      "faction": 302,
+      "second_faction": 0
+    },
+    {
+      "id": 2113,
+      "trigger_group": 1,
+      "faction": 301,
+      "second_faction": 0
+    },
+    {
+      "id": 2115,
+      "trigger_group": 3,
+      "faction": 304,
+      "second_faction": 0
+    },
+    {
+      "id": 2131,
+      "trigger_group": 5,
+      "faction": 303,
+      "second_faction": 0
+    },
+    {
+      "id": 2154,
+      "trigger_group": 4,
+      "faction": 301,
+      "second_faction": 0
+    },
+    {
+      "id": 2157,
+      "trigger_group": 2,
+      "faction": 301,
+      "second_faction": 0
+    },
+    {
+      "id": 2168,
+      "trigger_group": 4,
+      "faction": 302,
+      "second_faction": 0
+    },
+    {
+      "id": 2170,
+      "trigger_group": 4,
+      "faction": 305,
+      "second_faction": 0
+    },
+    {
+      "id": 2120,
+      "trigger_group": 0,
+      "faction": 301,
+      "second_faction": 0
+    },
+    {
+      "id": 2123,
+      "trigger_group": 0,
+      "faction": 303,
+      "second_faction": 0
+    },
+    {
+      "id": 2127,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 0
+    },
+    {
+      "id": 2132,
+      "trigger_group": 0,
+      "faction": 302,
+      "second_faction": 0
+    },
+    {
+      "id": 2136,
+      "trigger_group": 0,
+      "faction": 303,
+      "second_faction": 0
+    },
+    {
+      "id": 2139,
+      "trigger_group": 0,
+      "faction": 303,
+      "second_faction": 0
+    },
+    {
+      "id": 2140,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 0
+    },
+    {
+      "id": 2144,
+      "trigger_group": 0,
+      "faction": 302,
+      "second_faction": 0
+    },
+    {
+      "id": 2146,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 0
+    },
+    {
+      "id": 2151,
+      "trigger_group": 0,
+      "faction": 301,
+      "second_faction": 0
+    },
+    {
+      "id": 2152,
+      "trigger_group": 0,
+      "faction": 302,
+      "second_faction": 0
+    },
+    {
+      "id": 2153,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 0
+    },
+    {
+      "id": 2155,
+      "trigger_group": 0,
+      "faction": 301,
+      "second_faction": 0
+    },
+    {
+      "id": 2171,
+      "trigger_group": 0,
+      "faction": 305,
+      "second_faction": 0
+    },
+    {
+      "id": 2172,
+      "trigger_group": 0,
+      "faction": 305,
+      "second_faction": 0
+    },
+    {
+      "id": 2173,
+      "trigger_group": 0,
+      "faction": 305,
+      "second_faction": 0
+    },
+    {
+      "id": 2107,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 0
+    },
+    {
+      "id": 2110,
+      "trigger_group": 0,
+      "faction": 301,
+      "second_faction": 0
+    },
+    {
+      "id": 2135,
+      "trigger_group": 0,
+      "faction": 303,
+      "second_faction": 0
+    },
+    {
+      "id": 2145,
+      "trigger_group": 0,
+      "faction": 302,
+      "second_faction": 0
+    },
+    {
+      "id": 2174,
+      "trigger_group": 0,
+      "faction": 305,
+      "second_faction": 0
+    },
+    {
+      "id": 2138,
+      "trigger_group": 0,
+      "faction": 303,
+      "second_faction": 104
+    },
+    {
+      "id": 2124,
+      "trigger_group": 0,
+      "faction": 301,
+      "second_faction": 303
+    },
+    {
+      "id": 2125,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 303
+    },
+    {
+      "id": 2134,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 302
+    },
+    {
+      "id": 2158,
+      "trigger_group": 0,
+      "faction": 302,
+      "second_faction": 301
+    },
+    {
+      "id": 2175,
+      "trigger_group": 0,
+      "faction": 303,
+      "second_faction": 302
+    },
+    {
+      "id": 2176,
+      "trigger_group": 0,
+      "faction": 302,
+      "second_faction": 305
+    },
+    {
+      "id": 2177,
+      "trigger_group": 0,
+      "faction": 303,
+      "second_faction": 305
+    },
+    {
+      "id": 2178,
+      "trigger_group": 0,
+      "faction": 305,
+      "second_faction": 301
+    },
+    {
+      "id": 2150,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 501
+    },
+    {
+      "id": 2156,
+      "trigger_group": 0,
+      "faction": 301,
+      "second_faction": 502
+    },
+    {
+      "id": 2159,
+      "trigger_group": 0,
+      "faction": 302,
+      "second_faction": 503
+    },
+    {
+      "id": 2169,
+      "trigger_group": 0,
+      "faction": 303,
+      "second_faction": 504
+    },
+    {
+      "id": 2160,
+      "trigger_group": 0,
+      "faction": 304,
+      "second_faction": 603
+    },
+    {
+      "id": 2181,
+      "trigger_group": 0,
+      "faction": 305,
+      "second_faction": 602
+    },
+    {
+      "id": 2179,
+      "trigger_group": 0,
+      "faction": 302,
+      "second_faction": 705
+    },
+    {
+      "id": 3304,
+      "trigger_group": 5,
+      "faction": 403,
+      "second_faction": 0
+    },
+    {
+      "id": 3322,
+      "trigger_group": 3,
+      "faction": 404,
+      "second_faction": 0
+    },
+    {
+      "id": 3327,
+      "trigger_group": 4,
+      "faction": 405,
+      "second_faction": 0
+    },
+    {
+      "id": 3355,
+      "trigger_group": 1,
+      "faction": 406,
+      "second_faction": 0
+    },
+    {
+      "id": 3356,
+      "trigger_group": 2,
+      "faction": 406,
+      "second_faction": 0
+    },
+    {
+      "id": 3364,
+      "trigger_group": 2,
+      "faction": 405,
+      "second_faction": 0
+    },
+    {
+      "id": 3366,
+      "trigger_group": 4,
+      "faction": 407,
+      "second_faction": 0
+    },
+    {
+      "id": 3310,
+      "trigger_group": 0,
+      "faction": 403,
+      "second_faction": 0
+    },
+    {
+      "id": 3311,
+      "trigger_group": 0,
+      "faction": 403,
+      "second_faction": 0
+    },
+    {
+      "id": 3331,
+      "trigger_group": 0,
+      "faction": 404,
+      "second_faction": 0
+    },
+    {
+      "id": 3333,
+      "trigger_group": 0,
+      "faction": 405,
+      "second_faction": 0
+    },
+    {
+      "id": 3334,
+      "trigger_group": 0,
+      "faction": 405,
+      "second_faction": 0
+    },
+    {
+      "id": 3342,
+      "trigger_group": 0,
+      "faction": 404,
+      "second_faction": 0
+    },
+    {
+      "id": 3343,
+      "trigger_group": 0,
+      "faction": 405,
+      "second_faction": 0
+    },
+    {
+      "id": 3358,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 0
+    },
+    {
+      "id": 3359,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 0
+    },
+    {
+      "id": 3360,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 0
+    },
+    {
+      "id": 3361,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 0
+    },
+    {
+      "id": 3362,
+      "trigger_group": 0,
+      "faction": 404,
+      "second_faction": 0
+    },
+    {
+      "id": 3363,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 0
+    },
+    {
+      "id": 3367,
+      "trigger_group": 0,
+      "faction": 407,
+      "second_faction": 0
+    },
+    {
+      "id": 3368,
+      "trigger_group": 0,
+      "faction": 407,
+      "second_faction": 0
+    },
+    {
+      "id": 3369,
+      "trigger_group": 0,
+      "faction": 407,
+      "second_faction": 0
+    },
+    {
+      "id": 3313,
+      "trigger_group": 0,
+      "faction": 403,
+      "second_faction": 0
+    },
+    {
+      "id": 3315,
+      "trigger_group": 0,
+      "faction": 403,
+      "second_faction": 0
+    },
+    {
+      "id": 3323,
+      "trigger_group": 0,
+      "faction": 404,
+      "second_faction": 0
+    },
+    {
+      "id": 3335,
+      "trigger_group": 0,
+      "faction": 405,
+      "second_faction": 0
+    },
+    {
+      "id": 3357,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 0
+    },
+    {
+      "id": 3370,
+      "trigger_group": 0,
+      "faction": 407,
+      "second_faction": 0
+    },
+    {
+      "id": 3321,
+      "trigger_group": 0,
+      "faction": 403,
+      "second_faction": 103
+    },
+    {
+      "id": 3324,
+      "trigger_group": 0,
+      "faction": 404,
+      "second_faction": 103
+    },
+    {
+      "id": 3344,
+      "trigger_group": 0,
+      "faction": 405,
+      "second_faction": 105
+    },
+    {
+      "id": 3374,
+      "trigger_group": 0,
+      "faction": 407,
+      "second_faction": 101
+    },
+    {
+      "id": 3337,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 301
+    },
+    {
+      "id": 3325,
+      "trigger_group": 0,
+      "faction": 405,
+      "second_faction": 404
+    },
+    {
+      "id": 3338,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 403
+    },
+    {
+      "id": 3340,
+      "trigger_group": 0,
+      "faction": 404,
+      "second_faction": 406
+    },
+    {
+      "id": 3341,
+      "trigger_group": 0,
+      "faction": 403,
+      "second_faction": 405
+    },
+    {
+      "id": 3371,
+      "trigger_group": 0,
+      "faction": 406,
+      "second_faction": 405
+    },
+    {
+      "id": 3372,
+      "trigger_group": 0,
+      "faction": 404,
+      "second_faction": 407
+    },
+    {
+      "id": 3373,
+      "trigger_group": 0,
+      "faction": 407,
+      "second_faction": 405
+    },
+    {
+      "id": 3365,
+      "trigger_group": 0,
+      "faction": 403,
+      "second_faction": 605
+    },
+    {
+      "id": 3403,
+      "trigger_group": 5,
+      "faction": 502,
+      "second_faction": 0
+    },
+    {
+      "id": 3416,
+      "trigger_group": 3,
+      "faction": 504,
+      "second_faction": 0
+    },
+    {
+      "id": 3433,
+      "trigger_group": 1,
+      "faction": 501,
+      "second_faction": 0
+    },
+    {
+      "id": 3434,
+      "trigger_group": 2,
+      "faction": 501,
+      "second_faction": 0
+    },
+    {
+      "id": 3435,
+      "trigger_group": 4,
+      "faction": 503,
+      "second_faction": 0
+    },
+    {
+      "id": 3457,
+      "trigger_group": 1,
+      "faction": 505,
+      "second_faction": 0
+    },
+    {
+      "id": 3458,
+      "trigger_group": 2,
+      "faction": 505,
+      "second_faction": 0
+    },
+    {
+      "id": 3410,
+      "trigger_group": 0,
+      "faction": 502,
+      "second_faction": 0
+    },
+    {
+      "id": 3421,
+      "trigger_group": 0,
+      "faction": 502,
+      "second_faction": 0
+    },
+    {
+      "id": 3427,
+      "trigger_group": 0,
+      "faction": 501,
+      "second_faction": 0
+    },
+    {
+      "id": 3429,
+      "trigger_group": 0,
+      "faction": 501,
+      "second_faction": 0
+    },
+    {
+      "id": 3441,
+      "trigger_group": 0,
+      "faction": 501,
+      "second_faction": 0
+    },
+    {
+      "id": 3444,
+      "trigger_group": 0,
+      "faction": 503,
+      "second_faction": 0
+    },
+    {
+      "id": 3445,
+      "trigger_group": 0,
+      "faction": 503,
+      "second_faction": 0
+    },
+    {
+      "id": 3446,
+      "trigger_group": 0,
+      "faction": 503,
+      "second_faction": 0
+    },
+    {
+      "id": 3449,
+      "trigger_group": 0,
+      "faction": 504,
+      "second_faction": 0
+    },
+    {
+      "id": 3450,
+      "trigger_group": 0,
+      "faction": 504,
+      "second_faction": 0
+    },
+    {
+      "id": 3451,
+      "trigger_group": 0,
+      "faction": 504,
+      "second_faction": 0
+    },
+    {
+      "id": 3455,
+      "trigger_group": 0,
+      "faction": 502,
+      "second_faction": 0
+    },
+    {
+      "id": 3459,
+      "trigger_group": 0,
+      "faction": 505,
+      "second_faction": 0
+    },
+    {
+      "id": 3460,
+      "trigger_group": 0,
+      "faction": 505,
+      "second_faction": 0
+    },
+    {
+      "id": 3461,
+      "trigger_group": 0,
+      "faction": 505,
+      "second_faction": 0
+    },
+    {
+      "id": 3422,
+      "trigger_group": 0,
+      "faction": 502,
+      "second_faction": 0
+    },
+    {
+      "id": 3440,
+      "trigger_group": 0,
+      "faction": 501,
+      "second_faction": 0
+    },
+    {
+      "id": 3447,
+      "trigger_group": 0,
+      "faction": 503,
+      "second_faction": 0
+    },
+    {
+      "id": 3454,
+      "trigger_group": 0,
+      "faction": 504,
+      "second_faction": 0
+    },
+    {
+      "id": 3462,
+      "trigger_group": 0,
+      "faction": 505,
+      "second_faction": 0
+    },
+    {
+      "id": 3452,
+      "trigger_group": 0,
+      "faction": 501,
+      "second_faction": 105
+    },
+    {
+      "id": 3448,
+      "trigger_group": 0,
+      "faction": 503,
+      "second_faction": 201
+    },
+    {
+      "id": 3467,
+      "trigger_group": 0,
+      "faction": 504,
+      "second_faction": 205
+    },
+    {
+      "id": 3468,
+      "trigger_group": 0,
+      "faction": 505,
+      "second_faction": 305
+    },
+    {
+      "id": 3466,
+      "trigger_group": 0,
+      "faction": 503,
+      "second_faction": 403
+    },
+    {
+      "id": 3405,
+      "trigger_group": 0,
+      "faction": 501,
+      "second_faction": 504
+    },
+    {
+      "id": 3438,
+      "trigger_group": 0,
+      "faction": 503,
+      "second_faction": 502
+    },
+    {
+      "id": 3439,
+      "trigger_group": 0,
+      "faction": 502,
+      "second_faction": 501
+    },
+    {
+      "id": 3456,
+      "trigger_group": 0,
+      "faction": 504,
+      "second_faction": 503
+    },
+    {
+      "id": 3463,
+      "trigger_group": 0,
+      "faction": 505,
+      "second_faction": 503
+    },
+    {
+      "id": 3464,
+      "trigger_group": 0,
+      "faction": 503,
+      "second_faction": 501
+    },
+    {
+      "id": 3465,
+      "trigger_group": 0,
+      "faction": 502,
+      "second_faction": 505
+    },
+    {
+      "id": 3443,
+      "trigger_group": 0,
+      "faction": 502,
+      "second_faction": 604
+    },
+    {
+      "id": 3453,
+      "trigger_group": 0,
+      "faction": 504,
+      "second_faction": 702
+    },
+    {
+      "id": 3469,
+      "trigger_group": 0,
+      "faction": 504,
+      "second_faction": 705
+    },
+    {
+      "id": 3521,
+      "trigger_group": 1,
+      "faction": 601,
+      "second_faction": 0
+    },
+    {
+      "id": 3526,
+      "trigger_group": 5,
+      "faction": 602,
+      "second_faction": 0
+    },
+    {
+      "id": 3547,
+      "trigger_group": 4,
+      "faction": 603,
+      "second_faction": 0
+    },
+    {
+      "id": 3549,
+      "trigger_group": 2,
+      "faction": 603,
+      "second_faction": 0
+    },
+    {
+      "id": 3550,
+      "trigger_group": 3,
+      "faction": 605,
+      "second_faction": 0
+    },
+    {
+      "id": 3555,
+      "trigger_group": 4,
+      "faction": 604,
+      "second_faction": 0
+    },
+    {
+      "id": 3506,
+      "trigger_group": 0,
+      "faction": 603,
+      "second_faction": 0
+    },
+    {
+      "id": 3507,
+      "trigger_group": 0,
+      "faction": 603,
+      "second_faction": 0
+    },
+    {
+      "id": 3509,
+      "trigger_group": 0,
+      "faction": 604,
+      "second_faction": 0
+    },
+    {
+      "id": 3515,
+      "trigger_group": 0,
+      "faction": 602,
+      "second_faction": 0
+    },
+    {
+      "id": 3517,
+      "trigger_group": 0,
+      "faction": 603,
+      "second_faction": 0
+    },
+    {
+      "id": 3518,
+      "trigger_group": 0,
+      "faction": 604,
+      "second_faction": 0
+    },
+    {
+      "id": 3528,
+      "trigger_group": 0,
+      "faction": 601,
+      "second_faction": 0
+    },
+    {
+      "id": 3529,
+      "trigger_group": 0,
+      "faction": 601,
+      "second_faction": 0
+    },
+    {
+      "id": 3530,
+      "trigger_group": 0,
+      "faction": 602,
+      "second_faction": 0
+    },
+    {
+      "id": 3531,
+      "trigger_group": 0,
+      "faction": 604,
+      "second_faction": 0
+    },
+    {
+      "id": 3535,
+      "trigger_group": 0,
+      "faction": 601,
+      "second_faction": 0
+    },
+    {
+      "id": 3538,
+      "trigger_group": 0,
+      "faction": 602,
+      "second_faction": 0
+    },
+    {
+      "id": 3551,
+      "trigger_group": 0,
+      "faction": 605,
+      "second_faction": 0
+    },
+    {
+      "id": 3552,
+      "trigger_group": 0,
+      "faction": 605,
+      "second_faction": 0
+    },
+    {
+      "id": 3553,
+      "trigger_group": 0,
+      "faction": 605,
+      "second_faction": 0
+    },
+    {
+      "id": 3505,
+      "trigger_group": 0,
+      "faction": 603,
+      "second_faction": 0
+    },
+    {
+      "id": 3513,
+      "trigger_group": 0,
+      "faction": 602,
+      "second_faction": 0
+    },
+    {
+      "id": 3519,
+      "trigger_group": 0,
+      "faction": 604,
+      "second_faction": 0
+    },
+    {
+      "id": 3536,
+      "trigger_group": 0,
+      "faction": 601,
+      "second_faction": 0
+    },
+    {
+      "id": 3554,
+      "trigger_group": 0,
+      "faction": 605,
+      "second_faction": 0
+    },
+    {
+      "id": 3542,
+      "trigger_group": 0,
+      "faction": 604,
+      "second_faction": 104
+    },
+    {
+      "id": 3558,
+      "trigger_group": 0,
+      "faction": 605,
+      "second_faction": 203
+    },
+    {
+      "id": 3537,
+      "trigger_group": 0,
+      "faction": 601,
+      "second_faction": 301
+    },
+    {
+      "id": 3540,
+      "trigger_group": 0,
+      "faction": 603,
+      "second_faction": 304
+    },
+    {
+      "id": 3539,
+      "trigger_group": 0,
+      "faction": 602,
+      "second_faction": 503
+    },
+    {
+      "id": 3560,
+      "trigger_group": 0,
+      "faction": 604,
+      "second_faction": 505
+    },
+    {
+      "id": 3534,
+      "trigger_group": 0,
+      "faction": 601,
+      "second_faction": 602
+    },
+    {
+      "id": 3543,
+      "trigger_group": 0,
+      "faction": 601,
+      "second_faction": 603
+    },
+    {
+      "id": 3544,
+      "trigger_group": 0,
+      "faction": 604,
+      "second_faction": 603
+    },
+    {
+      "id": 3545,
+      "trigger_group": 0,
+      "faction": 603,
+      "second_faction": 604
+    },
+    {
+      "id": 3546,
+      "trigger_group": 0,
+      "faction": 602,
+      "second_faction": 604
+    },
+    {
+      "id": 3556,
+      "trigger_group": 0,
+      "faction": 604,
+      "second_faction": 605
+    },
+    {
+      "id": 3557,
+      "trigger_group": 0,
+      "faction": 605,
+      "second_faction": 601
+    },
+    {
+      "id": 3559,
+      "trigger_group": 0,
+      "faction": 605,
+      "second_faction": 602
+    },
+    {
+      "id": 3225,
+      "trigger_group": 3,
+      "faction": 703,
+      "second_faction": 0
+    },
+    {
+      "id": 3226,
+      "trigger_group": 1,
+      "faction": 701,
+      "second_faction": 0
+    },
+    {
+      "id": 3227,
+      "trigger_group": 2,
+      "faction": 701,
+      "second_faction": 0
+    },
+    {
+      "id": 3243,
+      "trigger_group": 5,
+      "faction": 702,
+      "second_faction": 0
+    },
+    {
+      "id": 3254,
+      "trigger_group": 4,
+      "faction": 704,
+      "second_faction": 0
+    },
+    {
+      "id": 3264,
+      "trigger_group": 2,
+      "faction": 704,
+      "second_faction": 0
+    },
+    {
+      "id": 3268,
+      "trigger_group": 1,
+      "faction": 705,
+      "second_faction": 0
+    },
+    {
+      "id": 3230,
+      "trigger_group": 0,
+      "faction": 703,
+      "second_faction": 0
+    },
+    {
+      "id": 3232,
+      "trigger_group": 0,
+      "faction": 701,
+      "second_faction": 0
+    },
+    {
+      "id": 3233,
+      "trigger_group": 0,
+      "faction": 701,
+      "second_faction": 0
+    },
+    {
+      "id": 3245,
+      "trigger_group": 0,
+      "faction": 704,
+      "second_faction": 0
+    },
+    {
+      "id": 3246,
+      "trigger_group": 0,
+      "faction": 704,
+      "second_faction": 0
+    },
+    {
+      "id": 3247,
+      "trigger_group": 0,
+      "faction": 704,
+      "second_faction": 0
+    },
+    {
+      "id": 3248,
+      "trigger_group": 0,
+      "faction": 704,
+      "second_faction": 0
+    },
+    {
+      "id": 3250,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 0
+    },
+    {
+      "id": 3251,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 0
+    },
+    {
+      "id": 3252,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 0
+    },
+    {
+      "id": 3258,
+      "trigger_group": 0,
+      "faction": 703,
+      "second_faction": 0
+    },
+    {
+      "id": 3259,
+      "trigger_group": 0,
+      "faction": 703,
+      "second_faction": 0
+    },
+    {
+      "id": 3265,
+      "trigger_group": 0,
+      "faction": 701,
+      "second_faction": 0
+    },
+    {
+      "id": 3266,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 0
+    },
+    {
+      "id": 3271,
+      "trigger_group": 0,
+      "faction": 705,
+      "second_faction": 0
+    },
+    {
+      "id": 3272,
+      "trigger_group": 0,
+      "faction": 705,
+      "second_faction": 0
+    },
+    {
+      "id": 3273,
+      "trigger_group": 0,
+      "faction": 705,
+      "second_faction": 0
+    },
+    {
+      "id": 3228,
+      "trigger_group": 0,
+      "faction": 703,
+      "second_faction": 0
+    },
+    {
+      "id": 3236,
+      "trigger_group": 0,
+      "faction": 701,
+      "second_faction": 0
+    },
+    {
+      "id": 3249,
+      "trigger_group": 0,
+      "faction": 704,
+      "second_faction": 0
+    },
+    {
+      "id": 3253,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 0
+    },
+    {
+      "id": 3274,
+      "trigger_group": 0,
+      "faction": 705,
+      "second_faction": 0
+    },
+    {
+      "id": 3260,
+      "trigger_group": 0,
+      "faction": 703,
+      "second_faction": 103
+    },
+    {
+      "id": 3278,
+      "trigger_group": 0,
+      "faction": 705,
+      "second_faction": 304
+    },
+    {
+      "id": 3261,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 406
+    },
+    {
+      "id": 3262,
+      "trigger_group": 0,
+      "faction": 704,
+      "second_faction": 503
+    },
+    {
+      "id": 3263,
+      "trigger_group": 0,
+      "faction": 701,
+      "second_faction": 501
+    },
+    {
+      "id": 3267,
+      "trigger_group": 0,
+      "faction": 701,
+      "second_faction": 602
+    },
+    {
+      "id": 3205,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 703
+    },
+    {
+      "id": 3255,
+      "trigger_group": 0,
+      "faction": 703,
+      "second_faction": 701
+    },
+    {
+      "id": 3256,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 701
+    },
+    {
+      "id": 3257,
+      "trigger_group": 0,
+      "faction": 704,
+      "second_faction": 701
+    },
+    {
+      "id": 3275,
+      "trigger_group": 0,
+      "faction": 705,
+      "second_faction": 703
+    },
+    {
+      "id": 3276,
+      "trigger_group": 0,
+      "faction": 702,
+      "second_faction": 705
+    },
+    {
+      "id": 3277,
+      "trigger_group": 0,
+      "faction": 701,
+      "second_faction": 704
+    }
+  ]
+}

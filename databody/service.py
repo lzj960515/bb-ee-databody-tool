@@ -7,10 +7,12 @@ import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 
 from .bodies import append_body, body_entries, capacity, double_value, nested, pack_from_save
+from .body_types import BodyRequest
 from .save_codec import SaveDocument
 
 
@@ -78,7 +80,7 @@ class DataBodyService:
             raise ValueError("存档已发生变化，请重新载入后再操作")
         return raw
 
-    def _validate_selection(self, character_id: int, strategy_ids: list[int], qualities: list[int]) -> dict:
+    def _validate_selection(self, character_id: int, strategy_ids: Sequence[int], qualities: Sequence[int]) -> dict:
         if character_id not in self.characters:
             raise ValueError("请选择有效角色")
         if len(strategy_ids) != 2 or len(qualities) != 2 or len(set(strategy_ids)) != 2:
@@ -97,22 +99,59 @@ class DataBodyService:
 
     def add_body(self, path: str | Path, character_id: int, strategy_ids: list[int], qualities: list[int],
                  *, body_quality: int = 3) -> dict:
+        request = BodyRequest(character_id, tuple(strategy_ids), tuple(qualities), body_quality)
+        result = self.add_bodies(path, [request])
+        return {"uid": result["uids"][0], "backup_path": result["backup_path"], "count": result["count"]}
+
+    def add_bodies(self, path: str | Path, requests: list[BodyRequest]) -> dict:
+        """整批校验后一次保存；任一请求失败时不会写入部分数据体。"""
         path = Path(path).resolve()
-        character = self._validate_selection(character_id, strategy_ids, qualities)
-        score = self._score_for_body_color(body_quality)
+        if not requests:
+            raise ValueError("请至少选择一个要添加的数据体")
+        scores = []
+        for request in requests:
+            self._validate_selection(request.character_id, request.strategy_ids, request.qualities)
+            scores.append(self._score_for_body_color(request.body_quality))
         original = self._current_save(path)
         document = SaveDocument.from_compressed(original)
-        uid = append_body(document, character, strategy_ids, qualities, self.catalog["rules"], score=score)
+        self._validate_batch_limits(document, len(requests))
+        uids = []
+        for request, score in zip(requests, scores):
+            character = self.characters[request.character_id]
+            uid = append_body(document, character, request.strategy_ids, request.qualities,
+                              self.catalog["rules"], score=score)
+            uids.append(uid)
         updated = document.to_compressed()
-        # 编码后核对两项继承策略和决定颜色的评分，再开始磁盘操作。
+        count = self._verify_created_bodies(updated, requests, uids, scores)
+        backup = self._commit(path, original, updated)
+        return {"uids": uids, "backup_path": str(backup), "count": count}
+
+    def _validate_batch_limits(self, document: SaveDocument, count: int) -> None:
+        _, pack = pack_from_save(document)
+        entries = body_entries(pack)
+        available = capacity(pack, self.catalog["rules"]) - len(entries)
+        # 新增评分可能解锁后续仓库页；整批仍以操作前已解锁的容量为准。
+        if available < count:
+            raise ValueError(f"当前已解锁的数据体仓库剩余 {max(0, available)} 个位置，本次需要 {count} 个，请先在游戏中清理仓库")
+        last_uid = max([pack.get_varint(2), *(uid for uid, _ in entries)])
+        if last_uid + count >= 1 << 32:
+            raise ValueError("数据体编号已达到游戏格式上限")
+
+    def _verify_created_bodies(self, updated: bytes, requests: list[BodyRequest],
+                               uids: list[int], scores: list[int]) -> int:
+        # 完整编码回读后核对每个数据体，再进入唯一的磁盘提交点。
         verified = SaveDocument.from_compressed(updated)
         _, pack = pack_from_save(verified)
-        created = dict(body_entries(pack))[uid]
-        selected = [(nested(field).get_varint(1), nested(field).get_varint(2)) for field in created.fields(30)]
-        if selected != list(zip(strategy_ids, qualities)) or double_value(created, 16) != score:
-            raise ValueError("生成数据体的回读验证失败，原存档未修改")
-        backup = self._commit(path, original, updated)
-        return {"uid": uid, "backup_path": str(backup), "count": len(body_entries(pack))}
+        bodies = dict(body_entries(pack))
+        for request, uid, score in zip(requests, uids, scores):
+            created = bodies.get(uid)
+            if created is None or created.get_varint(2) != request.character_id:
+                raise ValueError("生成数据体的回读验证失败，原存档未修改")
+            selected = [(nested(field).get_varint(1), nested(field).get_varint(2)) for field in created.fields(30)]
+            expected = list(zip(request.strategy_ids, request.qualities))
+            if selected != expected or double_value(created, 16) != score:
+                raise ValueError("生成数据体的回读验证失败，原存档未修改")
+        return len(bodies)
 
     def _backup(self, path: Path, original: bytes) -> Path:
         directory = path.parent.parent / "DataBodyToolBackups"

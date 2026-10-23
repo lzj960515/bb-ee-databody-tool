@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import font, ttk
 from typing import Any
 
+from .theme import ACCENT, BACKGROUND, BORDER, INK, SURFACE, TEXT
 from .ui_types import StrategySelection
 
 
@@ -61,12 +62,14 @@ def _show_modal(
 
 
 def _text_view(parent: tk.Misc, text_font: font.Font, height: int) -> tuple[ttk.Frame, tk.Text]:
-    panel = ttk.Frame(parent)
+    panel = ttk.Frame(parent, style="Card.TFrame")
     panel.columnconfigure(0, weight=1)
     panel.rowconfigure(0, weight=1)
     text = tk.Text(
         panel, height=height, width=1, wrap="word", font=text_font,
-        relief="solid", borderwidth=1, padx=12, pady=10, spacing1=3, spacing3=7,
+        relief="flat", borderwidth=0, padx=14, pady=12, spacing1=3, spacing3=7,
+        background=SURFACE, foreground=TEXT, highlightthickness=1, highlightbackground=BORDER,
+        highlightcolor=ACCENT, selectbackground=ACCENT, selectforeground=SURFACE, insertbackground=INK,
         state="disabled", takefocus=False,
     )
     text.grid(row=0, column=0, sticky="nsew")
@@ -93,6 +96,7 @@ class StrategyDialog(tk.Toplevel):
     ) -> None:
         super().__init__(parent)
         self.withdraw()
+        self.configure(background=BACKGROUND)
         self.parent = parent.winfo_toplevel()
         self.title(title)
         self.strategies = strategies
@@ -131,13 +135,13 @@ class StrategyDialog(tk.Toplevel):
     def _build_content(self) -> None:
         content = ttk.Panedwindow(self, orient="horizontal")
         content.grid(row=0, column=0, sticky="nsew", padx=16, pady=(16, 10))
-        choices = ttk.Frame(content, padding=(0, 0, 12, 0), width=430)
-        details = ttk.Frame(content, padding=(12, 0, 0, 0), width=530)
+        choices = ttk.Frame(content, padding=16, width=430, style="Card.TFrame")
+        details = ttk.Frame(content, padding=16, width=530, style="Card.TFrame")
         content.add(choices, weight=4)
         content.add(details, weight=5)
         choices.columnconfigure(0, weight=1)
         choices.rowconfigure(2, weight=1)
-        ttk.Label(choices, text="搜索策略名称、类别或流派").grid(row=0, column=0, sticky="w")
+        ttk.Label(choices, text="搜索策略名称、类别或流派", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
         self.search_entry = ttk.Entry(choices, textvariable=self.search_text)
         self.search_entry.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 10))
         self.strategy_list = ttk.Treeview(
@@ -153,21 +157,22 @@ class StrategyDialog(tk.Toplevel):
         scrollbar.grid(row=2, column=1, sticky="ns")
         self.strategy_list.configure(yscrollcommand=scrollbar.set)
         self.strategy_list.bind("<<TreeviewSelect>>", self._select_strategy)
-        ttk.Label(choices, textvariable=self.count_text).grid(row=3, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(choices, textvariable=self.count_text, style="CardMuted.TLabel").grid(row=3, column=0, sticky="w", pady=(8, 0))
 
         details.columnconfigure(0, weight=1)
         details.rowconfigure(4, weight=1)
-        self.name_label = ttk.Label(details, textvariable=self.name_text, font=self.heading_font, wraplength=480)
+        self.name_label = ttk.Label(details, textvariable=self.name_text, font=self.heading_font,
+                                    style="CardTitle.TLabel", wraplength=480)
         self.name_label.grid(row=0, column=0, sticky="ew")
-        self.category_label = ttk.Label(details, textvariable=self.category_text, wraplength=480)
+        self.category_label = ttk.Label(details, textvariable=self.category_text, style="CardMuted.TLabel", wraplength=480)
         self.category_label.grid(row=1, column=0, sticky="ew", pady=(6, 16))
-        quality_row = ttk.Frame(details)
+        quality_row = ttk.Frame(details, style="Card.TFrame")
         quality_row.grid(row=2, column=0, sticky="ew", pady=(0, 18))
-        ttk.Label(quality_row, text="策略品质").pack(side="left", padx=(0, 12))
+        ttk.Label(quality_row, text="策略品质", style="Card.TLabel").pack(side="left", padx=(0, 12))
         self.quality_combo = ttk.Combobox(quality_row, state="disabled", width=23)
         self.quality_combo.pack(side="left")
         self.quality_combo.bind("<<ComboboxSelected>>", self._select_quality)
-        ttk.Label(details, text="策略说明").grid(row=3, column=0, sticky="w", pady=(0, 7))
+        ttk.Label(details, text="策略说明", style="CardTitle.TLabel").grid(row=3, column=0, sticky="w", pady=(0, 7))
         description_panel, self.description = _text_view(details, self.description_font, height=12)
         description_panel.grid(row=4, column=0, sticky="nsew")
         _replace_text(self.description, "选中策略后，这里会显示当前品质对应的完整效果。")
@@ -179,14 +184,15 @@ class StrategyDialog(tk.Toplevel):
         actions.columnconfigure(0, weight=1)
         ttk.Label(
             actions, text="保存选择后返回主窗口；点击“添加数据体并保存”时才会写入存档。",
-            wraplength=610,
+            wraplength=610, style="Muted.TLabel",
         ).grid(row=0, column=0, sticky="w", padx=(0, 16))
         ttk.Button(actions, text="取消", command=self._cancel, width=12).grid(row=0, column=1, padx=(0, 10))
-        self.save_button = ttk.Button(actions, text="保存选择", command=self._save, state="disabled", width=14)
+        self.save_button = ttk.Button(actions, text="保存选择", command=self._save, state="disabled",
+                                      width=14, style="Accent.TButton")
         self.save_button.grid(row=0, column=2)
 
     def _resize_details(self, event: tk.Event) -> None:
-        width = max(event.width - 24, 180)
+        width = max(event.width - 32, 180)
         self.name_label.configure(wraplength=width)
         self.category_label.configure(wraplength=width)
 
@@ -264,6 +270,7 @@ class BodiesDialog(tk.Toplevel):
     def __init__(self, parent: tk.Misc, save: dict) -> None:
         super().__init__(parent)
         self.withdraw()
+        self.configure(background=BACKGROUND)
         self.parent = parent.winfo_toplevel()
         self.title("已有数据体")
         self.bodies = [
@@ -291,7 +298,7 @@ class BodiesDialog(tk.Toplevel):
         self._build_search(save)
         self._build_table()
         self._build_details()
-        ttk.Button(self, text="关闭", command=self.destroy, width=14).grid(
+        ttk.Button(self, text="关闭", command=self.destroy, width=14, style="Accent.TButton").grid(
             row=3, column=0, sticky="e", padx=16, pady=(0, 16)
         )
         self.protocol("WM_DELETE_WINDOW", self.destroy)
@@ -303,16 +310,16 @@ class BodiesDialog(tk.Toplevel):
         panel = ttk.Frame(self, padding=(16, 16, 16, 10))
         panel.grid(row=0, column=0, sticky="ew")
         panel.columnconfigure(0, weight=1)
-        ttk.Label(panel, text=f"共 {save['count']} 个数据体，容量 {save['capacity']} 个。").grid(
+        ttk.Label(panel, text=f"共 {save['count']} 个数据体，容量 {save['capacity']} 个。", style="Title.TLabel").grid(
             row=0, column=0, sticky="w"
         )
         ttk.Entry(panel, textvariable=self.path_text, state="readonly").grid(
             row=1, column=0, columnspan=2, sticky="ew", pady=(7, 12)
         )
-        ttk.Label(panel, text="搜索角色或策略").grid(row=2, column=0, sticky="w")
+        ttk.Label(panel, text="搜索角色或策略", style="Muted.TLabel").grid(row=2, column=0, sticky="w")
         self.search_entry = ttk.Entry(panel, textvariable=self.search_text)
         self.search_entry.grid(row=3, column=0, sticky="ew", pady=(5, 0))
-        ttk.Label(panel, textvariable=self.count_text).grid(row=3, column=1, padx=(16, 0))
+        ttk.Label(panel, textvariable=self.count_text, style="Muted.TLabel").grid(row=3, column=1, padx=(16, 0))
 
     def _build_table(self) -> None:
         panel = ttk.Frame(self)
@@ -338,10 +345,10 @@ class BodiesDialog(tk.Toplevel):
         self.body_list.bind("<<TreeviewSelect>>", self._select_body)
 
     def _build_details(self) -> None:
-        panel = ttk.LabelFrame(self, text="所选数据体", padding=10)
+        panel = ttk.LabelFrame(self, text="所选数据体", padding=14, style="Card.TLabelframe")
         panel.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 12))
         panel.columnconfigure(0, weight=1)
-        self.selection_label = ttk.Label(panel, textvariable=self.selection_text, wraplength=1080)
+        self.selection_label = ttk.Label(panel, textvariable=self.selection_text, style="CardTitle.TLabel", wraplength=1080)
         self.selection_label.grid(row=0, column=0, sticky="ew", pady=(0, 7))
         details_panel, self.details = _text_view(panel, self.detail_font, height=5)
         details_panel.grid(row=1, column=0, sticky="ew")

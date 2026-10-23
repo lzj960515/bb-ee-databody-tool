@@ -7,7 +7,8 @@ from unittest.mock import patch
 import lz4.frame
 
 from databody.save_codec import Field, Message, SaveDocument
-from databody.bodies import body_entries, double_value, nested, pack_from_save
+from databody.bodies import MODEL_NAME, body_entries, double_field, double_value, nested, pack_from_save
+from databody.body_types import BodyRequest
 from databody.service import DataBodyService
 
 
@@ -17,8 +18,10 @@ def msg(*fields):
 
 CATALOG = {
     "characters": [{"id": 101101, "name": "白面", "base_attrs": [{"type": 1, "value": 1000}],
-                    "talents": [{"id": 5034, "quality": 1, "inheritNum": 1}], "potentials": []}],
-    "strategies": [{"id": n, "name": str(n), "qualities": [1, 2, 3, 4]} for n in (2113, 2120)],
+                    "talents": [{"id": 5034, "quality": 1, "inheritNum": 1}], "potentials": []},
+                   {"id": 102101, "name": "拉格纳", "base_attrs": [{"type": 1, "value": 900}],
+                    "talents": [], "potentials": []}],
+    "strategies": [{"id": n, "name": str(n), "qualities": [1, 2, 3, 4]} for n in (2113, 2120, 2226, 2227)],
     "rules": {"inherit_score": 600, "page_size": 30, "page_unlock_scores": [0, 10000, 30000],
               "body_colors": [{"quality": 3, "name": "紫色", "score": 600},
                               {"quality": 4, "name": "金色", "score": 700}]},
@@ -54,6 +57,137 @@ class ServiceTests(unittest.TestCase):
 
     def add(self):
         return self.service.add_body(self.path, 101101, [2113, 2120], [4, 3])
+
+    def batch_requests(self):
+        return [BodyRequest(101101, (2113, 2120), (4, 3)),
+                BodyRequest(102101, (2226, 2227), (3, 4), body_quality=4)]
+
+    def test_batch_adds_two_bodies_with_one_original_backup_and_can_restore(self):
+        result = self.service.add_bodies(self.path, self.batch_requests())
+        updated = self.path.read_bytes()
+        document = SaveDocument.from_compressed(updated)
+        _, pack = pack_from_save(document)
+        _, original_pack = pack_from_save(SaveDocument.from_compressed(self.original))
+        bodies = dict(body_entries(pack))
+        self.assertEqual(result["uids"], [6, 7])
+        self.assertEqual(result["count"], 3)
+        self.assertEqual(pack.get_varint(2), 7)
+        self.assertEqual(pack.get_varint(5), 31300)
+        self.assertEqual(pack.fields(1)[0].raw, original_pack.fields(1)[0].raw)
+        self.assertEqual(pack.get_bytes(77), b"unknown")
+        self.assertEqual(document.get_model("ModelPlayer"), b"do-not-change")
+        for uid, request, score in zip(result["uids"], self.batch_requests(), (600, 700)):
+            with self.subTest(uid=uid):
+                body = bodies[uid]
+                self.assertEqual(body.get_varint(2), request.character_id)
+                self.assertEqual(double_value(body, 16), score)
+                inherited = [(nested(f).get_varint(1), nested(f).get_varint(2)) for f in body.fields(30)]
+                self.assertEqual(inherited, list(zip(request.strategy_ids, request.qualities)))
+        backups = list((self.root / "DataBodyToolBackups").glob("*.bak"))
+        self.assertEqual(backups, [Path(result["backup_path"])])
+        self.assertEqual(backups[0].read_bytes(), self.original)
+        restored = self.service.restore_backup(self.path, backups[0])
+        self.assertEqual(restored["count"], 1)
+        self.assertEqual(self.path.read_bytes(), self.original)
+        self.assertEqual(Path(restored["backup_path"]).read_bytes(), updated)
+
+    def test_batch_rejects_empty_requests_without_backup_or_write(self):
+        with self.assertRaisesRegex(ValueError, "至少|不能为空"):
+            self.service.add_bodies(self.path, [])
+        self.assertEqual(self.path.read_bytes(), self.original)
+        self.assertFalse((self.root / "DataBodyToolBackups").exists())
+
+    def test_invalid_second_request_rejects_entire_batch_without_backup(self):
+        invalid_requests = [BodyRequest(999999, (2226, 2227), (4, 3)),
+                            BodyRequest(102101, (9999, 2227), (4, 3)),
+                            BodyRequest(102101, (2226, 2226), (4, 3)),
+                            BodyRequest(102101, (2226, 2227), (5, 3)),
+                            BodyRequest(102101, (2226, 2227), (4, 3), body_quality=2)]
+        for invalid in invalid_requests:
+            with self.subTest(request=invalid), self.assertRaises(ValueError):
+                self.service.add_bodies(self.path, [self.batch_requests()[0], invalid])
+        self.assertEqual(self.path.read_bytes(), self.original)
+        self.assertFalse((self.root / "DataBodyToolBackups").exists())
+
+    def test_batch_checks_initial_capacity_before_new_scores_unlock_another_page(self):
+        self.service.catalog["rules"].update(page_size=2, page_unlock_scores=[0, 30600])
+        with self.assertRaisesRegex(ValueError, "容量|位置|仓库"):
+            self.service.add_bodies(self.path, self.batch_requests())
+        self.assertEqual(self.path.read_bytes(), self.original)
+        self.assertFalse((self.root / "DataBodyToolBackups").exists())
+
+    def test_batch_uid_overflow_rejects_entire_batch_without_backup(self):
+        document = SaveDocument.from_compressed(self.original)
+        model, pack = pack_from_save(document)
+        pack = pack.replace(2, [Field.varint(2, (1 << 32) - 2)])
+        document.replace_model(MODEL_NAME, model.replace(1, [Field.bytes(1, pack.to_bytes())]).to_bytes())
+        original = document.to_compressed()
+        self.path.write_bytes(original)
+        self.service.load_save(self.path)
+        with self.assertRaisesRegex(ValueError, "编号|上限"):
+            self.service.add_bodies(self.path, self.batch_requests())
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertFalse((self.root / "DataBodyToolBackups").exists())
+
+    def test_batch_verifies_each_character_strategy_quality_and_score_before_writing(self):
+        encode = SaveDocument.to_compressed
+
+        def encode_with_mismatch(document):
+            corrupted = SaveDocument.from_compressed(encode(document))
+            model, pack = pack_from_save(corrupted)
+            entry = nested(pack.fields(1)[-1])
+            body = Message.parse(entry.get_bytes(2))
+            if mismatch == "character":
+                body = body.replace(2, [Field.varint(2, 101101)])
+            elif mismatch == "score":
+                body = body.replace(16, [double_field(16, 600)])
+            else:
+                blessings = list(body.fields(30))
+                first = nested(blessings[0])
+                field_number, value = (1, 2113) if mismatch == "strategy" else (2, 1)
+                first = first.replace(field_number, [Field.varint(field_number, value)])
+                blessings[0] = Field.bytes(30, first.to_bytes())
+                body = body.replace(30, blessings)
+            entry = entry.replace(2, [Field.bytes(2, body.to_bytes())])
+            entries = [*pack.fields(1)[:-1], Field.bytes(1, entry.to_bytes())]
+            pack = pack.replace(1, entries)
+            corrupted.replace_model(MODEL_NAME, model.replace(1, [Field.bytes(1, pack.to_bytes())]).to_bytes())
+            return encode(corrupted)
+
+        for mismatch in ("character", "strategy", "quality", "score"):
+            with self.subTest(mismatch=mismatch), patch.object(SaveDocument, "to_compressed", encode_with_mismatch):
+                with self.assertRaisesRegex(ValueError, "回读验证"):
+                    self.service.add_bodies(self.path, self.batch_requests())
+            self.assertEqual(self.path.read_bytes(), self.original)
+            self.assertFalse((self.root / "DataBodyToolBackups").exists())
+
+    def test_batch_replace_failure_keeps_original_and_removes_temporary_file(self):
+        with patch("databody.service.os.replace", side_effect=OSError("replace unavailable")):
+            with self.assertRaisesRegex(OSError, "replace unavailable"):
+                self.service.add_bodies(self.path, self.batch_requests())
+        self.assertEqual(self.path.read_bytes(), self.original)
+        self.assertEqual(list(self.path.parent.glob(".databody-*")), [])
+        backups = list((self.root / "DataBodyToolBackups").glob("*.bak"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), self.original)
+
+    def test_batch_detects_external_change_during_backup_before_replacing_file(self):
+        backup = self.service._backup
+        external_update = self.original + b"external update"
+
+        def save_changed_during_backup(path, original):
+            result = backup(path, original)
+            path.write_bytes(external_update)
+            return result
+
+        with patch.object(self.service, "_backup", side_effect=save_changed_during_backup):
+            with self.assertRaisesRegex(ValueError, "变化|重新"):
+                self.service.add_bodies(self.path, self.batch_requests())
+        self.assertEqual(self.path.read_bytes(), external_update)
+        self.assertEqual(list(self.path.parent.glob(".databody-*")), [])
+        backups = list((self.root / "DataBodyToolBackups").glob("*.bak"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), self.original)
 
     def test_add_preserves_existing_models_and_body_and_allocates_unique_id(self):
         result = self.add()

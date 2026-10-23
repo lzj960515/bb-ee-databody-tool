@@ -2,63 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, font, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
-from databody.service import DataBodyService
-from databody.dialogs import BodiesDialog, StrategyDialog, display_text, quality_label
-from databody.ui_types import StrategySelection
-
-
-class StrategySlot(ttk.LabelFrame):
-    """主界面只保存已确认的选择；弹窗负责搜索和编辑临时选择。"""
-
-    def __init__(self, parent: tk.Misc, title: str, strategies: list[dict]) -> None:
-        super().__init__(parent, text=title, padding=18)
-        self.slot_title = title
-        self.strategies = strategies
-        self.strategy_by_id = {strategy["id"]: strategy for strategy in strategies}
-        self.selection: StrategySelection | None = None
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(2, weight=1)
-        self.name_text = tk.StringVar(value="尚未添加")
-        self.quality_text = tk.StringVar(value="点击下方按钮，在弹窗中搜索和选择策略。")
-        self.name_label = ttk.Label(self, textvariable=self.name_text, style="Selection.TLabel", wraplength=390)
-        self.name_label.grid(row=0, column=0, sticky="nw")
-        self.quality_label = ttk.Label(self, textvariable=self.quality_text, wraplength=390)
-        self.quality_label.grid(row=1, column=0, sticky="nw", pady=(10, 16))
-        self.choose_button = ttk.Button(self, text=f"添加{title}", command=self.edit_selection, padding=(18, 8))
-        self.choose_button.grid(row=3, column=0, sticky="sw")
-        self.bind("<Configure>", self._resize_summary)
-
-    def _resize_summary(self, event: tk.Event) -> None:
-        width = max(160, event.width - 40)
-        self.name_label.configure(wraplength=width)
-        self.quality_label.configure(wraplength=width)
-
-    def edit_selection(self) -> None:
-        dialog = StrategyDialog(self.winfo_toplevel(), f"选择{self.slot_title}", self.strategies, self.selection)
-        selected = dialog.show()
-        if selected is None:
-            return
-        self.selection = selected
-        strategy, detail = self._selected_detail()
-        self.name_text.set(display_text(detail["name"]))
-        self.quality_text.set(f"{display_text(strategy.get('category', ''))}  ·  {quality_label(detail)}")
-        self.choose_button.configure(text=f"修改{self.slot_title}")
-
-    def _selected_detail(self) -> tuple[dict, dict]:
-        if self.selection is None:
-            raise ValueError(f"请先添加{self.slot_title}。")
-        strategy = self.strategy_by_id[self.selection.strategy_id]
-        detail = next(detail for detail in strategy["quality_details"] if detail["quality"] == self.selection.quality)
-        return strategy, detail
-
-    def chosen_strategy(self) -> tuple[int, int, str]:
-        _, detail = self._selected_detail()
-        name = display_text(detail["name"])
-        return self.selection.strategy_id, self.selection.quality, f"{name}（{quality_label(detail)}）"
+from databody.service import DataBodyService, application_directory
+from databody.dialogs import BodiesDialog
+from .planner import BuildPlanner
+from .planner_ui import PlannerPanel
+from .theme import configure_theme
+from .widgets import StrategySlot
 
 
 class DataBodyWindow(ttk.Frame):
@@ -82,22 +36,17 @@ class DataBodyWindow(ttk.Frame):
         self.rowconfigure(3, weight=1)
         self._build_header()
         self._build_save_selector()
-        self._build_existing_bodies()
-        self._build_body_editor()
+        self._build_modes()
         self._build_actions()
         root.after_idle(self.refresh_saves)
 
     def _build_header(self) -> None:
-        header = ttk.Frame(self)
+        header = ttk.Frame(self, style="Header.TFrame", padding=(22, 15))
         header.grid(row=0, column=0, sticky="ew", pady=(0, 12))
-        ttk.Label(header, text="苍翼：混沌效应 · 数据体工具", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(header, text="苍翼：混沌效应  /  流派工坊", style="HeaderTitle.TLabel").pack(anchor="w")
         ttk.Label(
-            header, text="请先退出游戏，再添加或恢复数据体。每次保存都会自动备份原存档。"
+            header, text="选玩法，看路线，带上四项策略出发。    保存前请退出游戏 · 每次写入自动备份", style="HeaderSubtitle.TLabel"
         ).pack(anchor="w", pady=(5, 0))
-        ttk.Label(
-            header,
-            text="数据体颜色随评分变化，附带角色默认天赋和一级初始继承技能。策略前置条件及互斥仍按游戏规则。",
-        ).pack(anchor="w", pady=(3, 0))
 
     def _build_save_selector(self) -> None:
         panel = ttk.LabelFrame(self, text="目标存档", padding=10)
@@ -108,26 +57,31 @@ class DataBodyWindow(ttk.Frame):
         self.save_combo.bind("<<ComboboxSelected>>", self._select_save)
         ttk.Button(panel, text="刷新列表", command=self.refresh_saves).grid(row=0, column=1, padx=(8, 0))
         ttk.Button(panel, text="选择存档文件…", command=self.browse_save).grid(row=0, column=2, padx=(8, 0))
-        path = ttk.Entry(panel, textvariable=self.path_text, state="readonly")
-        path.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(7, 0))
-
-    def _build_existing_bodies(self) -> None:
-        panel = ttk.LabelFrame(self, text="已有数据体", padding=14)
-        panel.grid(row=2, column=0, sticky="ew", pady=(0, 14))
-        panel.columnconfigure(0, weight=1)
-        ttk.Label(panel, textvariable=self.count_text).grid(row=0, column=0, sticky="w")
+        ttk.Label(panel, textvariable=self.count_text, style="CardMuted.TLabel").grid(row=1, column=0, sticky="w", pady=(6, 0))
         self.view_bodies_button = ttk.Button(
             panel, text="查看已有数据体", command=self.view_bodies, state="disabled", padding=(16, 6)
         )
-        self.view_bodies_button.grid(row=0, column=1, padx=(16, 0))
+        self.view_bodies_button.grid(row=1, column=1, columnspan=2, sticky="e", pady=(6, 0))
 
     def view_bodies(self) -> None:
         if self.current_save is not None:
             BodiesDialog(self.root, self.current_save).show()
 
-    def _build_body_editor(self) -> None:
-        panel = ttk.LabelFrame(self, text="添加数据体", padding=10)
-        panel.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
+    def _build_modes(self) -> None:
+        self.mode_tabs = ttk.Notebook(self)
+        self.mode_tabs.grid(row=3, column=0, sticky="nsew", pady=(0, 12))
+        data_directory = application_directory() / "data"
+        rules = json.loads((data_directory / "planner_rules.json").read_text(encoding="utf-8"))
+        knowledge = json.loads((data_directory / "builds.json").read_text(encoding="utf-8"))
+        planner = BuildPlanner(self.service.catalog, rules, knowledge)
+        self.planner_panel = PlannerPanel(self.mode_tabs, planner, self.body_colors, self._refresh_action)
+        self.mode_tabs.add(self.planner_panel, text="流派工坊 · 添加两个数据体")
+        manual = ttk.Frame(self.mode_tabs, padding=16)
+        self.mode_tabs.add(manual, text="自由添加 · 单个数据体")
+        self._build_body_editor(manual)
+        self.mode_tabs.bind("<<NotebookTabChanged>>", self._mode_changed)
+
+    def _build_body_editor(self, panel) -> None:
         panel.columnconfigure(0, weight=1, uniform="strategy")
         panel.columnconfigure(1, weight=1, uniform="strategy")
         panel.rowconfigure(1, weight=1)
@@ -159,10 +113,50 @@ class DataBodyWindow(ttk.Frame):
         self.status_label = ttk.Label(panel, textvariable=self.status_text, wraplength=680)
         self.status_label.grid(row=0, column=0, sticky="w", padx=(0, 12))
         ttk.Button(panel, text="恢复备份…", command=self.restore_backup).grid(row=0, column=1, padx=(0, 8))
-        self.add_button = ttk.Button(panel, text="添加数据体并保存", command=self.add_body, state="disabled")
+        self.add_button = ttk.Button(panel, text="添加两个数据体并保存", command=self.add_current_mode,
+                                     state="disabled", style="Accent.TButton")
         self.add_button.grid(row=0, column=2)
         backup = ttk.Entry(panel, textvariable=self.backup_text, state="readonly")
         backup.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+
+    def _mode_changed(self, _event) -> None:
+        self._refresh_action()
+
+    def _refresh_action(self) -> None:
+        if not hasattr(self, "add_button"):
+            return
+        planning = self.mode_tabs.index(self.mode_tabs.select()) == 0
+        self.add_button.configure(text="添加两个数据体并保存" if planning else "添加数据体并保存")
+        ready = self.current_save is not None
+        if planning:
+            ready = ready and not self.planner_panel.validation_errors()
+        self.add_button.configure(state="normal" if ready else "disabled")
+
+    def add_current_mode(self) -> None:
+        if self.mode_tabs.index(self.mode_tabs.select()) == 0:
+            self.add_build()
+        else:
+            self.add_body()
+
+    def add_build(self) -> None:
+        try:
+            if self.current_save is None:
+                raise ValueError("请先选择要修改的存档。")
+            requests = self.planner_panel.body_requests()
+            self._require_game_closed()
+            path = str(self.current_save["path"])
+            confirmed = messagebox.askokcancel(
+                "确认添加两个继承数据体",
+                self.planner_panel.confirmation_text() + f"\n\n目标存档：\n{path}\n\n"
+                "将一次添加两个数据体，保存前自动备份完整原存档。是否继续？", parent=self.root,
+            )
+            if not confirmed:
+                return
+            result = self.service.add_bodies(path, requests)
+        except Exception as error:
+            self._show_error("添加配套数据体失败", error)
+            return
+        self._show_saved_result(path, result, "已添加两个配套数据体")
 
     def refresh_saves(self) -> None:
         try:
@@ -211,10 +205,12 @@ class DataBodyWindow(ttk.Frame):
             return False
         self.current_save = saved
         self.path_text.set(str(saved["path"]))
+        if self.save_combo.current() < 0:
+            self.save_combo.set(str(saved["path"]))
         self.count_text.set(f"共 {saved['count']} 个数据体，容量 {saved['capacity']} 个。")
         self.view_bodies_button.configure(state="normal")
-        self.add_button.configure(state="normal")
-        self.status_text.set("存档已载入。选择角色和两个策略后，即可添加数据体。")
+        self._refresh_action()
+        self.status_text.set("存档已载入。可使用推荐流派，也可自由添加单个数据体。")
         return True
 
     def _require_game_closed(self) -> None:
@@ -252,11 +248,14 @@ class DataBodyWindow(ttk.Frame):
         except Exception as error:
             self._show_error("添加数据体失败", error)
             return
+        self._show_saved_result(path, result, f"已添加 {character['name']} 的数据体")
+
+    def _show_saved_result(self, path: str, result: dict, description: str) -> None:
         backup_path = str(result["backup_path"])
         self.backup_text.set(f"最近备份：{backup_path}")
         reloaded = self._load_save(path)
         if reloaded:
-            self.status_text.set(f"已添加 {character['name']} 的数据体，现有 {result['count']} 个。")
+            self.status_text.set(f"{description}，现有 {result['count']} 个。")
         else:
             self.status_text.set("添加已完成，但重新读取失败；请重新选择存档查看结果。")
         messagebox.showinfo("数据体已添加", f"保存成功。\n\n原存档备份：\n{backup_path}", parent=self.root)
@@ -305,23 +304,14 @@ class DataBodyWindow(ttk.Frame):
 def main() -> None:
     root = tk.Tk()
     root.withdraw()
-    root.title("苍翼：混沌效应 · 数据体工具")
+    root.title("苍翼：混沌效应 · 流派工坊与数据体工具")
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
-    available_fonts = font.families(root)
-    family = "Microsoft YaHei UI" if "Microsoft YaHei UI" in available_fonts else "Segoe UI"
-    for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
-        font.nametofont(name, root=root).configure(family=family, size=10)
-    style = ttk.Style(root)
-    if "vista" in style.theme_names():
-        style.theme_use("vista")
-    style.configure("Title.TLabel", font=(family, 17, "bold"))
-    style.configure("Selection.TLabel", font=(family, 14, "bold"))
-    style.configure("Treeview", rowheight=25)
-    width = min(1120, root.winfo_screenwidth() - 80)
-    height = min(720, root.winfo_screenheight() - 100)
+    configure_theme(root)
+    width = min(1320, root.winfo_screenwidth() - 80)
+    height = min(920, root.winfo_screenheight() - 100)
     root.geometry(f"{width}x{height}")
-    root.minsize(min(920, width), min(620, height))
+    root.minsize(min(1080, width), min(760, height))
     try:
         service = DataBodyService()
         DataBodyWindow(root, service)
