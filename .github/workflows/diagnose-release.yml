@@ -1,35 +1,23 @@
-name: Inspect failed release log
+name: Repair v1.3.0 release notes
 on:
   push:
     branches: ['diagnostics/v1.2.0-release']
 permissions:
-  contents: read
+  contents: write
 jobs:
-  inspect:
-    runs-on: windows-latest
+  update-notes:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 73fc4c092656e9ead166af82ad2b80e45b62f6b8
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Replay previous test and build
-        shell: python
+          ref: main
+          fetch-depth: 0
+      - name: Restore notes from the unchanged annotated tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          import subprocess, sys
-          commands = [
-              [sys.executable, '-m', 'venv', '.venv'],
-              [r'.venv\Scripts\python.exe', '-m', 'pip', 'install', '-r', 'requirements.txt', 'pyinstaller==6.16.0'],
-              [r'.venv\Scripts\python.exe', '-m', 'unittest', 'discover', '-s', 'tests', '-v'],
-              ['pwsh', '-File', 'build.ps1'],
-          ]
-          for index, command in enumerate(commands):
-              result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-              output = result.stdout.decode('utf-8', errors='replace')
-              lines = output.splitlines()[-80:]
-              for offset in range(0, len(lines), 15):
-                  chunk = '\n'.join(lines[offset:offset + 15]).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-                  print(f'::notice title=Command {index} output {offset}::{chunk}')
-              if result.returncode:
-                  sys.exit(result.returncode)
+          set -euo pipefail
+          git for-each-ref --format='%(contents)' refs/tags/v1.3.0 > release-notes.md
+          test -s release-notes.md
+          gh release edit v1.3.0 --notes-file release-notes.md
