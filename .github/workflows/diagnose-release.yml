@@ -1,0 +1,25 @@
+name: Inspect failed release log
+on:
+  push:
+    branches: ['diagnostics/v1.2.0-release']
+permissions:
+  actions: read
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read failed build output
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lines = gh api repos/lzj960515/bb-ee-databody-tool/actions/jobs/120236829535/logs
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to read build log' }
+          $tail = @($lines | Select-Object -Last 100)
+          for ($offset = 0; $offset -lt $tail.Count; $offset += 20) {
+            $text = ($tail | Select-Object -Skip $offset -First 20) -join "`n"
+            $escaped = $text.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::notice title=Release log $offset::$escaped"
+          }
