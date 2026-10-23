@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>苍翼 · 数据体</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="model.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span
+        ><span>苍翼<span class="brand-sub">数据体</span></span>
+      </div>
+      <nav aria-label="功能">
+        <button class="nav-button active" data-action="mode" data-mode="build">
+          流派玩法</button
+        ><button class="nav-button" data-action="mode" data-mode="single">
+          单个数据体
+        </button>
+      </nav>
+      <div class="save-controls">
+        <select id="save-select" aria-label="目标存档">
+          <option value="">选择存档</option></select
+        ><button class="quiet-button" data-action="browse">浏览…</button
+        ><button class="quiet-button" data-action="bodies">
+          数据体仓库<span id="body-count"></span></button
+        ><button
+          class="icon-button"
+          data-action="restore"
+          title="恢复备份"
+          aria-label="恢复备份"
+        >
+          ↶
+        </button>
+      </div>
+    </header>
+    <main id="workspace" aria-busy="true">
+      <div class="loading">正在载入…</div>
+    </main>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+    <dialog id="modal"><div id="modal-content"></div></dialog>
+  </body>
+</html>

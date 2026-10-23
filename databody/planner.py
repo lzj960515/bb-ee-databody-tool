@@ -16,9 +16,7 @@ TRIGGER_NAMES = {1: '普攻', 2: '技能', 3: '冲刺', 4: '传承技', 5: '召�
 class BuildPlanner:
     def __init__(self, catalog: dict, rules: dict, knowledge: dict):
         self.strategies = {row['id']: row for row in catalog['strategies']}
-        self.characters = {row['id']: row for row in catalog['characters']}
         self.rules = {row['id']: row for row in rules['strategies']}
-        self.knowledge = knowledge
         if self.strategies.keys() != self.rules.keys():
             raise ValueError('策略目录与规划规则版本不一致')
         self.providers: dict[int, list[int]] = {}
@@ -27,23 +25,22 @@ class BuildPlanner:
                 self.providers.setdefault(label, []).append(strategy['id'])
         self.builds = self._build_definitions(knowledge)
         self.build_by_id = {build.id: build for build in self.builds}
-        self._recommended: dict[tuple[int, ...], tuple[int, ...]] = {}
+        self._recommended: dict[tuple[tuple[int, ...], tuple[int, ...]], tuple[int, ...]] = {}
 
     def _build_definitions(self, knowledge: dict) -> tuple[BuildDefinition, ...]:
         builds = []
         for row in knowledge['builds']:
             builds.append(BuildDefinition(
-                row['id'], row['title'], row['summary'], tuple(row['targets']),
-                tuple(row['starters']), tuple(row.get('tags', [])), tuple(row.get('chain', [])),
-                tuple(row.get('upgrades', [])), tuple(row.get('notes', [])),
-                tuple(row.get('source_ids', [])), True,
+                id=row['id'], title=row['title'], summary=row['summary'], targets=tuple(row['targets']),
+                starters=tuple(row.get('starters', [])), chain=tuple(row.get('chain', [])),
+                upgrades=tuple(row.get('upgrades', [])), notes=tuple(row.get('notes', [])),
+                required_inherited=tuple(row.get('required_inherited', [])),
             ))
         for strategy in self.strategies.values():
             if strategy['is_combined']:
                 builds.append(BuildDefinition(
                     f"strategy-{strategy['id']}", strategy['name'], strategy['description'],
-                    (strategy['id'],), tags=(strategy['category'], strategy['faction']),
-                    source_ids=('game-rules', 'strategy-wiki'),
+                    (strategy['id'],),
                 ))
         return tuple(builds)
 
@@ -97,20 +94,6 @@ class BuildPlanner:
         if any(strategy_id not in self.strategies for strategy_id in ids):
             raise ValueError('路线含当前目录不存在的策略')
 
-    def default_donors(self, character_id: int) -> tuple[int, int]:
-        if character_id not in self.characters:
-            raise ValueError('请选择本局使用角色')
-        preferred = (100101, 100301, 101101)
-        eligible = [c for c in preferred if c != character_id and not self.characters[c]['steam_dlc_id']]
-        return tuple(eligible[:2])
-
-    def validate_donors(self, character_id: int, donors: tuple[int, int]) -> None:
-        if (character_id not in self.characters or len(donors) != 2
-                or any(c not in self.characters for c in donors)):
-            raise ValueError('请选择本局角色和两个继承角色')
-        if len(set((character_id, *donors))) != 3:
-            raise ValueError('两个继承角色必须互不相同，并且都不能是本局使用角色')
-
     def _candidate_key(self, strategy_id: int, preferred: tuple[int, ...]) -> tuple:
         strategy = self.strategies[strategy_id]
         preference = preferred.index(strategy_id) if strategy_id in preferred else len(preferred)
@@ -137,8 +120,9 @@ class BuildPlanner:
             activation = self.evaluate_start(preferred)
             if not activation.conflicts and len(activation.active_ids) == 4 and set(targets).issubset(preferred):
                 return preferred
-        if targets in self._recommended:
-            return self._recommended[targets]
+        cache_key = targets, preferred
+        if cache_key in self._recommended:
+            return self._recommended[cache_key]
         # 先整体求解，允许为后一个目标回溯调整前一个目标的基础触发位。
         chosen = next(self._inherit_bundles(targets, preferred), ())
         for target in (() if chosen else targets):
@@ -160,7 +144,7 @@ class BuildPlanner:
                     chosen = bundle
         # 显示与保存顺序统一：先基础动作，再强化，再双重。
         chosen = tuple(sorted(chosen, key=lambda c: self.strategies[c]['gradation']))
-        self._recommended[targets] = chosen
+        self._recommended[cache_key] = chosen
         return chosen
 
     def can_draw(self, strategy_id: int, inherited: tuple[int, ...], acquired: tuple[int, ...]) -> bool:
@@ -208,7 +192,7 @@ class BuildPlanner:
         return progress
 
     def _obtain_options(self, strategy_id: int, inherited: tuple[int, ...], acquired: tuple[int, ...],
-                        visiting: frozenset[int] = frozenset()):
+                        visiting: frozenset[int] = frozenset(), preferred: tuple[int, ...] = ()):
         if strategy_id in visiting:
             return
         current = self._activate(inherited, acquired)
@@ -230,16 +214,16 @@ class BuildPlanner:
                     # 基础派系标签不由 faction*10 推导，直接从实际 I 级配置中选择。
                     bases = [c for c in self.strategies if self.rules[c]['faction'] == faction
                              and self.strategies[c]['gradation'] == 1]
-                    for base in sorted(bases, key=lambda c: self._candidate_key(c, ())):
-                        for state in self._obtain_options(base, inherited, acquired, visiting | {strategy_id}):
-                            yield from self._obtain_options(strategy_id, inherited, state, visiting)
+                    for base in sorted(bases, key=lambda c: self._candidate_key(c, preferred)):
+                        for state in self._obtain_options(base, inherited, acquired, visiting | {strategy_id}, preferred):
+                            yield from self._obtain_options(strategy_id, inherited, state, visiting, preferred)
                     return
         missing = [label for label in requirements if label not in current.labels]
         if missing:
-            candidates = sorted(self.providers.get(missing[0], ()), key=lambda c: self._candidate_key(c, ()))
+            candidates = sorted(self.providers.get(missing[0], ()), key=lambda c: self._candidate_key(c, preferred))
             for candidate in candidates:
-                for state in self._obtain_options(candidate, inherited, acquired, visiting | {strategy_id}):
-                    yield from self._obtain_options(strategy_id, inherited, state, visiting)
+                for state in self._obtain_options(candidate, inherited, acquired, visiting | {strategy_id}, preferred):
+                    yield from self._obtain_options(strategy_id, inherited, state, visiting, preferred)
             return
         if strategy_id in inherited:
             yield acquired
@@ -252,39 +236,50 @@ class BuildPlanner:
         return tuple(c for c in self.strategies if self.strategies[c]['gradation'] == 3
                      and self.rules[c]['faction'] in factions)
 
-    def plan(self, build_id: str, character_id: int, *, starting_ids: tuple[int, ...] | None = None,
+    def complete_route(self, required: tuple[int, ...], inherited: tuple[int, ...],
+                       preferred: tuple[int, ...] = ()) -> tuple[int, ...] | None:
+        """补齐整套目标；后续目标受阻时回溯前面的基础触发位选择。"""
+        self._validate_ids((*required, *inherited))
+        if self._conflicts(inherited):
+            return None
+        return next(self._route_options(required, inherited, (), preferred), None)
+
+    def _route_options(self, remaining: tuple[int, ...], inherited: tuple[int, ...],
+                       acquired: tuple[int, ...], preferred: tuple[int, ...]):
+        if not remaining:
+            yield acquired
+            return
+        for state in self._obtain_options(remaining[0], inherited, acquired, preferred=preferred):
+            yield from self._route_options(remaining[1:], inherited, state, preferred)
+
+    def plan(self, build_id: str, *, starting_ids: tuple[int, ...] | None = None,
              targets: tuple[int, ...] | None = None) -> BuildPlan:
         build = self.build_by_id[build_id]
-        self.default_donors(character_id)
         goals = tuple(dict.fromkeys(targets if targets is not None else build.targets))
         self._validate_ids(goals)
-        starters = tuple(starting_ids) if starting_ids is not None else self.recommend_start(goals, build.starters)
+        if starting_ids is None:
+            starters = build.required_inherited or self.recommend_start(goals, build.starters)
+        else:
+            starters = tuple(starting_ids)
         activation = self.evaluate_start(starters)
         errors = list(activation.conflicts)
-        errors.extend(self._conflicts(goals))
-        if len(starters) != 4:
-            errors.append('两个数据体需要四项不同的策略，请补齐开局配置')
+        if len(starters) > 4:
+            errors.append('两个数据体最多继承四项策略')
         steps: list[RouteStep] = []
         acquired: tuple[int, ...] = ()
         if not errors:
             required = tuple(dict.fromkeys((*goals, *(c for c, _ in activation.missing_labels))))
-            for goal in required:
-                route = next(self._obtain_options(goal, starters, acquired), None)
-                if route is None:
-                    errors.append(f'当前开局无法按默认规则补齐“{self.name(goal)}”；请调整继承策略或目标组合')
-                else:
-                    steps.extend(RouteStep(c, '补齐成型') for c in route[len(acquired):])
-                    acquired = route
+            route = self.complete_route(required, starters, build.starters)
+            if route is None:
+                errors.append('当前继承搭配无法补齐这套玩法，请调整继承策略')
+            else:
+                acquired = route
+                steps.extend(RouteStep(c, '补齐成型') for c in acquired)
             growth = build.upgrades or self._growth_targets(starters)
             for goal in growth:
-                route = next(self._obtain_options(goal, starters, acquired), None)
+                route = next(self._obtain_options(goal, starters, acquired, preferred=build.starters), None)
                 if route is not None:
                     steps.extend(RouteStep(c, '后续强化') for c in route[len(acquired):])
                     acquired = route
-        notes = [*build.notes]
-        if activation.missing_labels:
-            notes.append('部分继承策略开局未激活；先按“补齐成型”路线取得基础策略，才会生效。')
-        notes.append('路线表示满足规则后的获取顺序；局内选项随机出现，满足前置不保证下一次就刷出。')
-        notes.append('按默认契约规划。契约可能改变策略冲突规则；本工具不替你取得契约或角色潜能。')
-        return BuildPlan(build, character_id, goals, starters, activation, tuple(steps),
-                         tuple(dict.fromkeys(errors)), tuple(notes))
+        return BuildPlan(build, goals, starters, activation, tuple(steps),
+                         tuple(dict.fromkeys(errors)), build.notes)

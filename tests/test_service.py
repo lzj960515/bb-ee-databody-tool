@@ -84,7 +84,9 @@ class ServiceTests(unittest.TestCase):
                 inherited = [(nested(f).get_varint(1), nested(f).get_varint(2)) for f in body.fields(30)]
                 self.assertEqual(inherited, list(zip(request.strategy_ids, request.qualities)))
         backups = list((self.root / "DataBodyToolBackups").glob("*.bak"))
-        self.assertEqual(backups, [Path(result["backup_path"])])
+        self.assertEqual(len(backups), 1)
+        # Windows 临时目录可能用短路径，服务返回的长路径仍指向同一备份。
+        self.assertTrue(backups[0].samefile(result["backup_path"]))
         self.assertEqual(backups[0].read_bytes(), self.original)
         restored = self.service.restore_backup(self.path, backups[0])
         self.assertEqual(restored["count"], 1)

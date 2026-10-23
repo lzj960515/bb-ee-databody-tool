@@ -9,12 +9,10 @@ class BuildDefinition:
     summary: str
     targets: tuple[int, ...]
     starters: tuple[int, ...] = ()
-    tags: tuple[str, ...] = ()
     chain: tuple[str, ...] = ()
     upgrades: tuple[int, ...] = ()
     notes: tuple[str, ...] = ()
-    source_ids: tuple[str, ...] = ()
-    featured: bool = False
+    required_inherited: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -34,7 +32,6 @@ class RouteStep:
 @dataclass(frozen=True)
 class BuildPlan:
     build: BuildDefinition
-    character_id: int
     targets: tuple[int, ...]
     starting_ids: tuple[int, ...]
     activation: Activation

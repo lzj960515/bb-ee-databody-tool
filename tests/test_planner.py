@@ -16,7 +16,7 @@ class PlannerTests(unittest.TestCase):
         cls.planner = BuildPlanner(read('catalog.json'), read('planner_rules.json'), read('builds.json'))
 
     def test_lightning_chain_has_both_base_triggers_and_all_four_active(self):
-        plan = self.planner.plan('lightning-lance', 103501)
+        plan = self.planner.plan('lightning-lance')
         self.assertEqual(set(plan.starting_ids), {2115, 3549, 3540, 3543})
         self.assertEqual(set(plan.activation.active_ids), set(plan.starting_ids))
         self.assertFalse(plan.errors)
@@ -29,7 +29,7 @@ class PlannerTests(unittest.TestCase):
         self.assertIn(6031, dict(activation.missing_labels)[3543])
 
     def test_fire_chain_is_active_with_skill_storm_and_inherit_fire_ring(self):
-        plan = self.planner.plan('storm-fire', 103501)
+        plan = self.planner.plan('storm-fire')
         self.assertEqual(set(plan.starting_ids), {3264, 2474, 2470, 2462})
         self.assertEqual(len(plan.activation.active_ids), 4)
         self.assertFalse(plan.errors)
@@ -45,18 +45,21 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(targets, automatic)
         self.assertEqual(len(targets), 100)
 
-    def test_generated_routes_have_four_conflict_free_active_starters(self):
+    def test_generated_routes_use_viable_inheritance_for_each_build(self):
         for build in self.planner.builds:
             with self.subTest(build=build.id):
-                plan = self.planner.plan(build.id, 103501)
-                self.assertEqual(len(plan.starting_ids), 4)
+                plan = self.planner.plan(build.id)
+                if build.required_inherited:
+                    self.assertEqual(plan.starting_ids, build.required_inherited)
+                else:
+                    self.assertEqual(len(plan.starting_ids), 4)
+                    self.assertEqual(set(plan.starting_ids), set(plan.activation.active_ids))
                 self.assertFalse(plan.activation.conflicts)
-                self.assertEqual(set(plan.starting_ids), set(plan.activation.active_ids))
                 self.assertFalse(plan.errors)
 
     def test_normal_route_obeys_draw_rules_at_each_step(self):
         for build in self.planner.builds:
-            plan = self.planner.plan(build.id, 103501)
+            plan = self.planner.plan(build.id)
             acquired = []
             for step in plan.steps:
                 with self.subTest(build=build.id, strategy=step.strategy_id):
@@ -69,7 +72,7 @@ class PlannerTests(unittest.TestCase):
         self.assertIn(3540, self.planner.evaluate_start(starts).active_ids)
 
     def test_custom_incompatible_goals_are_explicit(self):
-        plan = self.planner.plan('lightning-lance', 103501, targets=(3540, 3543, 3544))
+        plan = self.planner.plan('lightning-lance', targets=(3540, 3543, 3544))
         self.assertTrue(plan.errors)
 
     def test_inactive_inherited_tier_does_not_block_normal_same_tier_draw(self):
@@ -80,20 +83,40 @@ class PlannerTests(unittest.TestCase):
         self.assertFalse(self.planner.can_draw(3361, starts, ()))
 
     def test_multiple_goals_choose_complementary_base_trigger_slots(self):
-        plan = self.planner.plan('strategy-2470', 103501, targets=(2470, 2481))
+        plan = self.planner.plan('strategy-2470', targets=(2470, 2481))
         self.assertFalse(plan.errors)
         self.assertEqual(set(plan.starting_ids), {3264, 2474, 2470, 2481})
 
-    def test_donors_are_distinct_free_characters_other_than_played(self):
-        for character in self.planner.characters.values():
-            donors = self.planner.default_donors(character['id'])
-            self.assertEqual(len(set(donors)), 2)
-            self.assertNotIn(character['id'], donors)
-            self.assertTrue(all(not self.planner.characters[c]['steam_dlc_id'] for c in donors))
-        with self.assertRaises(ValueError):
-            self.planner.validate_donors(103501, (103501, 100101))
-        with self.assertRaises(ValueError):
-            self.planner.validate_donors(103501, (100101, 100101))
+    def test_planning_does_not_need_a_character_catalog(self):
+        read = lambda name: json.loads((ROOT / 'data' / name).read_text(encoding='utf-8'))
+        catalog = read('catalog.json')
+        catalog.pop('characters')
+        planner = BuildPlanner(catalog, read('planner_rules.json'), read('builds.json'))
+        self.assertFalse(planner.plan('storm-fire').errors)
+
+    def test_manual_selection_can_be_partial_and_inactive(self):
+        selected = (2470, 2462)
+        plan = self.planner.plan('storm-fire', starting_ids=selected)
+        self.assertEqual(plan.starting_ids, selected)
+        self.assertEqual(plan.activation.active_ids, ())
+        self.assertFalse(plan.errors)
+        acquired = ()
+        for step in plan.steps:
+            self.assertTrue(self.planner.can_draw(step.strategy_id, selected, acquired))
+            acquired += (step.strategy_id,)
+
+    def test_final_dual_effects_can_coexist_after_delayed_inheritance_activation(self):
+        # 先拿四张局内红，再拿召唤光阵，才激活带进来的三张红。
+        inherited = (3534, 3546, 3539)
+        goals = (3557, 3545, 3543, 3556, 3534, 3546, 3539)
+        plan = self.planner.plan('strategy-3557', starting_ids=inherited, targets=goals)
+        self.assertFalse(plan.errors)
+        acquired = ()
+        for step in plan.steps:
+            self.assertTrue(self.planner.can_draw(step.strategy_id, inherited, acquired))
+            acquired += (step.strategy_id,)
+        final = self.planner._activate(inherited, acquired)
+        self.assertTrue(set(goals).issubset(final.active_ids))
 
 
 if __name__ == '__main__':

@@ -16,6 +16,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Test and build Windows EXE
         shell: pwsh
         run: |
@@ -24,8 +27,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw '创建构建环境失败' }
           & .\.venv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller==6.16.0
           if ($LASTEXITCODE -ne 0) { throw '安装构建依赖失败' }
-          & .\.venv\Scripts\python.exe -m unittest discover -s tests -v
+          & .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
           if ($LASTEXITCODE -ne 0) { throw '测试失败' }
+          node --test tests/frontend_model.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw '网页交互模型测试失败' }
           .\build.ps1
       - name: Package and publish release
         shell: pwsh
@@ -36,8 +41,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Path release-assets | Out-Null
           Copy-Item -LiteralPath 'dist/数据体工具.exe' -Destination 'release-assets/bb-ee-databody-tool.exe'
-          Copy-Item -LiteralPath 'dist/使用说明.md' -Destination 'release-assets/README.zh-CN.md'
-          Compress-Archive -LiteralPath 'dist/数据体工具.exe','dist/使用说明.md' -DestinationPath 'release-assets/bb-ee-databody-tool-portable.zip'
+          $readme = [IO.File]::ReadAllText((Join-Path $PWD 'dist/使用说明.md'))
+          $screenshotUrl = "https://raw.githubusercontent.com/${{ github.repository }}/$env:RELEASE_TAG/docs/images/build-planner.png"
+          [IO.File]::WriteAllText((Join-Path $PWD 'release-assets/README.zh-CN.md'), $readme.Replace('](docs/images/build-planner.png)', "]($screenshotUrl)"), [Text.UTF8Encoding]::new($false))
+          Compress-Archive -LiteralPath 'dist/数据体工具.exe','dist/使用说明.md','dist/docs' -DestinationPath 'release-assets/bb-ee-databody-tool-portable.zip'
           $hashes = foreach ($name in @('bb-ee-databody-tool.exe','bb-ee-databody-tool-portable.zip','README.zh-CN.md')) {
             $hash = (Get-FileHash -LiteralPath "release-assets/$name" -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $name"
