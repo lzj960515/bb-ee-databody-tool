@@ -10,7 +10,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from .bodies import append_body, body_entries, capacity, nested, pack_from_save
+from .bodies import append_body, body_entries, capacity, double_value, nested, pack_from_save
 from .save_codec import SaveDocument
 
 
@@ -89,19 +89,27 @@ class DataBodyService:
                 raise ValueError("所选策略或品质不在当前游戏配置中")
         return self.characters[character_id]
 
-    def add_body(self, path: str | Path, character_id: int, strategy_ids: list[int], qualities: list[int]) -> dict:
+    def _score_for_body_color(self, quality: int) -> int:
+        for color in self.catalog["rules"]["body_colors"]:
+            if color["quality"] == quality:
+                return color["score"]
+        raise ValueError("请选择有效的数据体颜色")
+
+    def add_body(self, path: str | Path, character_id: int, strategy_ids: list[int], qualities: list[int],
+                 *, body_quality: int = 3) -> dict:
         path = Path(path).resolve()
         character = self._validate_selection(character_id, strategy_ids, qualities)
+        score = self._score_for_body_color(body_quality)
         original = self._current_save(path)
         document = SaveDocument.from_compressed(original)
-        uid = append_body(document, character, strategy_ids, qualities, self.catalog["rules"])
+        uid = append_body(document, character, strategy_ids, qualities, self.catalog["rules"], score=score)
         updated = document.to_compressed()
-        # 编码后再次解析完整容器，核对新增记录的两项继承策略，再开始磁盘操作。
+        # 编码后核对两项继承策略和决定颜色的评分，再开始磁盘操作。
         verified = SaveDocument.from_compressed(updated)
         _, pack = pack_from_save(verified)
         created = dict(body_entries(pack))[uid]
         selected = [(nested(field).get_varint(1), nested(field).get_varint(2)) for field in created.fields(30)]
-        if selected != list(zip(strategy_ids, qualities)):
+        if selected != list(zip(strategy_ids, qualities)) or double_value(created, 16) != score:
             raise ValueError("生成数据体的回读验证失败，原存档未修改")
         backup = self._commit(path, original, updated)
         return {"uid": uid, "backup_path": str(backup), "count": len(body_entries(pack))}

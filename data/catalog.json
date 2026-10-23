@@ -28028,6 +28028,18 @@
       0,
       10000,
       30000
+    ],
+    "body_colors": [
+      {
+        "quality": 3,
+        "name": "紫色",
+        "score": 600
+      },
+      {
+        "quality": 4,
+        "name": "金色",
+        "score": 700
+      }
     ]
   },
   "excluded_strategies": [

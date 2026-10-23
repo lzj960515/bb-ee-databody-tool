@@ -68,6 +68,7 @@ function replayInheritance(actor) {
   const rewards = readRows('BreedDungeonInheritReward').map(row => P.BreedDungeonInheritReward.fromObject(row));
   const source = fs.readFileSync(paths.dungeon, 'utf8');
   const actorSource = fs.readFileSync(paths.actor, 'utf8');
+  const actorUtilSource = fs.readFileSync(paths.actorUtil, 'utf8');
   const between = (text, start, end) => {
     const offset = text.indexOf(start);
     if (offset < 0) throw new Error('Original method not found: ' + start);
@@ -76,6 +77,7 @@ function replayInheritance(actor) {
     return text.slice(offset, limit).trim();
   };
   const context = vm.createContext({P,
+    Misc_1: {Misc: readRows('Misc')[0]},
     Xlsx_1: {Xlsx: {
       BaseActorConf: {Get(id) {return actorConfigs.find(row => row.actorId === id);}},
       BlessConf: {Get(id) {return blessConfigs.find(row => row.id === id);}},
@@ -93,12 +95,15 @@ function replayInheritance(actor) {
   const blessMethod = between(source, 'getInheritBless() {', 'sanBuffFunctions() {');
   const rewardMethod = between(source, 'initFactorActorRewards() {', 'extraAddResource() {');
   const dungeon = vm.runInContext('({' + blessMethod + ',' + rewardMethod + '})', context);
+  const colorMethod = between(actorUtilSource, 'static GetFactorActorQuality(', 'static InitPlayerObjAttrFromFesActor(').replace(/^static /, '');
+  const colorRules = vm.runInContext('({' + colorMethod + '})', context);
   dungeon.baseInfo = {factorActorUid: [actor.uid]};
   dungeon.rewardInfo = {inheritBlessEnable: [], inheritAttrs: []};
   dungeon.FesActor = P.STFesActor.create();
   dungeon.dungeonFunctions = () => [];
   dungeon.initFactorActorRewards();
   return {
+    bodyQuality: colorRules.GetFactorActorQuality(actor.score),
     strategies: dungeon.getInheritBless().map(row => ({id: row.id, quality: row.quality})),
     skills: dungeon.FesActor.skills.map(row => ({id: row.id, level: row.level, fromActorId: row.fromActorId})),
     talents: dungeon.FesActor.talents.map(row => ({id: row.id, quality: row.quality, fromActorId: row.fromActorId}))
@@ -141,6 +146,7 @@ class GameSchemaOracleTests(unittest.TestCase):
                 "configs": str(ROOT / "research/resources/configs"),
                 "dungeon": str(ROOT / "research/js-selected/server/model/breeddungeon.js"),
                 "actor": str(ROOT / "research/js-selected/server/module/actor.js"),
+                "actorUtil": str(ROOT / "research/js-selected/core/actorutil.js"),
             }
         completed = subprocess.run([self.node, "-e", NODE_ORACLE], input=json.dumps(request),
                                    capture_output=True, text=True, encoding="utf-8")
@@ -217,6 +223,32 @@ class GameSchemaOracleTests(unittest.TestCase):
                 self.assertEqual(inherited["talents"], [{"id": character["talents"][0]["id"],
                                                         "quality": character["talents"][0]["quality"],
                                                         "fromActorId": character["id"]}])
+
+    def test_selected_colors_match_original_color_and_inheritance_rules(self):
+        records = []
+        character = CATALOG["characters"][0]
+        with tempfile.TemporaryDirectory(prefix="bb-ee-color-save-") as directory:
+            path = Path(directory) / "Save/4"
+            path.parent.mkdir()
+            path.write_bytes(sample_document().to_compressed())
+            service = DataBodyService()
+            service.load_save(path)
+            for color in CATALOG["rules"]["body_colors"]:
+                with patch.object(service, "game_running", return_value=False):
+                    added = service.add_body(path, character["id"], [2226, 2227], [4, 3],
+                                             body_quality=color["quality"])
+                _, pack = pack_from_save(SaveDocument.from_compressed(path.read_bytes()))
+                body = dict(body_entries(pack))[added["uid"]]
+                record = self.record("STFesActor", body.to_bytes())
+                record["replay"] = True
+                records.append(record)
+        results = self.decode(records, replay=True)
+        for color, actor in zip(CATALOG["rules"]["body_colors"], results):
+            with self.subTest(color=color["name"]):
+                self.assertEqual(actor["score"], color["score"])
+                self.assertEqual(actor["inheritanceReplay"]["bodyQuality"], color["quality"])
+                self.assertEqual(actor["inheritanceReplay"]["strategies"],
+                                 [{"id": 2226, "quality": 4}, {"id": 2227, "quality": 3}])
 
 
 class BodyLifecycleTests(unittest.TestCase):

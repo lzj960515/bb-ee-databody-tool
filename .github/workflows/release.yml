@@ -1,0 +1,47 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Test and build Windows EXE
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { throw '创建构建环境失败' }
+          & .\.venv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller==6.16.0
+          if ($LASTEXITCODE -ne 0) { throw '安装构建依赖失败' }
+          & .\.venv\Scripts\python.exe -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw '测试失败' }
+          .\build.ps1
+      - name: Package and publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path release-assets | Out-Null
+          Copy-Item -LiteralPath 'dist/数据体工具.exe' -Destination 'release-assets/bb-ee-databody-tool.exe'
+          Copy-Item -LiteralPath 'dist/使用说明.md' -Destination 'release-assets/README.zh-CN.md'
+          Compress-Archive -LiteralPath 'dist/数据体工具.exe','dist/使用说明.md' -DestinationPath 'release-assets/bb-ee-databody-tool-portable.zip'
+          $hashes = foreach ($name in @('bb-ee-databody-tool.exe','bb-ee-databody-tool-portable.zip','README.zh-CN.md')) {
+            $hash = (Get-FileHash -LiteralPath "release-assets/$name" -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $name"
+          }
+          [IO.File]::WriteAllText((Join-Path $PWD 'release-assets/SHA256SUMS.txt'), (($hashes -join "`n") + "`n"), [Text.UTF8Encoding]::new($false))
+          gh release create $env:RELEASE_TAG --verify-tag --title "$env:RELEASE_TAG · 数据体工具" --notes-from-tag --latest release-assets/bb-ee-databody-tool.exe release-assets/bb-ee-databody-tool-portable.zip release-assets/README.zh-CN.md release-assets/SHA256SUMS.txt
+          if ($LASTEXITCODE -ne 0) { throw '发布失败' }

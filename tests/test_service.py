@@ -7,6 +7,7 @@ from unittest.mock import patch
 import lz4.frame
 
 from databody.save_codec import Field, Message, SaveDocument
+from databody.bodies import body_entries, double_value, nested, pack_from_save
 from databody.service import DataBodyService
 
 
@@ -18,7 +19,9 @@ CATALOG = {
     "characters": [{"id": 101101, "name": "白面", "base_attrs": [{"type": 1, "value": 1000}],
                     "talents": [{"id": 5034, "quality": 1, "inheritNum": 1}], "potentials": []}],
     "strategies": [{"id": n, "name": str(n), "qualities": [1, 2, 3, 4]} for n in (2113, 2120)],
-    "rules": {"inherit_score": 600, "page_size": 30, "page_unlock_scores": [0, 10000, 30000]},
+    "rules": {"inherit_score": 600, "page_size": 30, "page_unlock_scores": [0, 10000, 30000],
+              "body_colors": [{"quality": 3, "name": "紫色", "score": 600},
+                              {"quality": 4, "name": "金色", "score": 700}]},
 }
 
 
@@ -75,6 +78,31 @@ class ServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "变化|重新"):
             self.add()
         self.assertEqual(self.path.read_bytes(), changed)
+
+    def test_selected_color_score_is_saved_and_updates_score_records(self):
+        gold = self.service.add_body(self.path, 101101, [2113, 2120], [4, 3], body_quality=4)
+        added = SaveDocument.from_compressed(self.path.read_bytes())
+        _, pack = pack_from_save(added)
+        body = dict(body_entries(pack))[gold["uid"]]
+        self.assertEqual(double_value(body, 16), 700)
+        self.assertEqual(pack.get_varint(5), 30700)
+        self.assertEqual(double_value(nested(pack.fields(4)[0]), 2), 700)
+        self.assertEqual([nested(f).get_varint(1) for f in body.fields(30)], [2113, 2120])
+        self.assertEqual([nested(f).get_varint(2) for f in body.fields(30)], [4, 3])
+        self.assertEqual(Path(gold["backup_path"]).read_bytes(), self.original)
+
+        purple = self.service.add_body(self.path, 101101, [2113, 2120], [4, 3], body_quality=3)
+        _, pack = pack_from_save(SaveDocument.from_compressed(self.path.read_bytes()))
+        self.assertEqual(double_value(dict(body_entries(pack))[purple["uid"]], 16), 600)
+        self.assertEqual(pack.get_varint(5), 31300)
+        self.assertEqual(double_value(nested(pack.fields(4)[0]), 2), 700)
+
+    def test_unsupported_body_color_is_rejected_before_backup_or_write(self):
+        for quality in (0, 1, 2, 5):
+            with self.subTest(quality=quality), self.assertRaisesRegex(ValueError, "颜色"):
+                self.service.add_body(self.path, 101101, [2113, 2120], [4, 3], body_quality=quality)
+        self.assertEqual(self.path.read_bytes(), self.original)
+        self.assertFalse((self.root / "DataBodyToolBackups").exists())
 
     def test_running_game_is_rejected_without_writing(self):
         with patch.object(self.service, "game_running", return_value=True):

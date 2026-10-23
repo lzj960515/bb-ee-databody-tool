@@ -72,6 +72,7 @@ class DataBodyWindow(ttk.Frame):
         self.selected_path: str | None = None
         self.current_save: dict | None = None
         self.characters = service.catalog["characters"]
+        self.body_colors = service.catalog["rules"]["body_colors"]
         self.path_text = tk.StringVar(value="尚未选择存档")
         self.count_text = tk.StringVar(value="请选择存档后查看已有数据体。")
         self.status_text = tk.StringVar(value="先选择存档，再选择角色和两个策略。")
@@ -93,10 +94,9 @@ class DataBodyWindow(ttk.Frame):
         ttk.Label(
             header, text="请先退出游戏，再添加或恢复数据体。每次保存都会自动备份原存档。"
         ).pack(anchor="w", pady=(5, 0))
-        score = self.service.catalog["rules"]["inherit_score"]
         ttk.Label(
             header,
-            text=f"新数据体为 {score} 分，附带角色默认天赋和一级初始继承技能。策略前置条件及互斥仍按游戏规则。",
+            text="数据体颜色随评分变化，附带角色默认天赋和一级初始继承技能。策略前置条件及互斥仍按游戏规则。",
         ).pack(anchor="w", pady=(3, 0))
 
     def _build_save_selector(self) -> None:
@@ -138,7 +138,14 @@ class DataBodyWindow(ttk.Frame):
             character_row, values=[character["name"] for character in self.characters], state="readonly", width=28
         )
         self.character_combo.pack(side="left")
-        ttk.Label(character_row, text="点击下方按钮，在大窗口中搜索并保存选择。").pack(side="left", padx=(18, 0))
+        ttk.Label(character_row, text="数据体颜色").pack(side="left", padx=(18, 8))
+        self.body_color_combo = ttk.Combobox(
+            character_row, values=[f"{color['name']}（{color['score']} 分）" for color in self.body_colors],
+            state="readonly", width=20,
+        )
+        self.body_color_combo.pack(side="left")
+        self.body_color_combo.current(0)
+        ttk.Label(character_row, text="两种颜色均可继承两项策略。").pack(side="left", padx=(18, 0))
         strategies = self.service.catalog["strategies"]
         self.first_strategy = StrategySlot(panel, "策略一", strategies)
         self.first_strategy.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
@@ -222,20 +229,25 @@ class DataBodyWindow(ttk.Frame):
             if character_index < 0:
                 raise ValueError("请先选择角色。")
             character = self.characters[character_index]
+            color_index = self.body_color_combo.current()
+            if color_index < 0:
+                raise ValueError("请先选择数据体颜色。")
+            color = self.body_colors[color_index]
             first = self.first_strategy.chosen_strategy()
             second = self.second_strategy.chosen_strategy()
             self._require_game_closed()
             path = str(self.current_save["path"])
             confirmed = messagebox.askokcancel(
                 "确认添加数据体",
-                f"角色：{character['name']}\n策略一：{first[2]}\n策略二：{second[2]}\n\n"
+                f"角色：{character['name']}\n数据体颜色：{color['name']}（{color['score']} 分）\n"
+                f"策略一：{first[2]}\n策略二：{second[2]}\n\n"
                 f"目标存档：\n{path}\n\n保存前会自动备份原存档。是否继续？",
                 parent=self.root,
             )
             if not confirmed:
                 return
             result = self.service.add_body(
-                path, character["id"], [first[0], second[0]], [first[1], second[1]]
+                path, character["id"], [first[0], second[0]], [first[1], second[1]], body_quality=color["quality"]
             )
         except Exception as error:
             self._show_error("添加数据体失败", error)

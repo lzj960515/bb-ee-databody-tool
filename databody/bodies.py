@@ -68,7 +68,7 @@ def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: l
     fields.extend(Field.bytes(8, payload) for payload in blessings)
     for potential in character.get("potentials", []):
         fields.append(Field.bytes(15, Message([Field.varint(1, potential["id"])]).to_bytes()))
-    # 600 分是本构建中保存两项继承策略的门槛，基础属性仍按角色初始配置。
+    # 评分决定数据体颜色；基础属性仍按角色初始配置，不随颜色提高。
     fields.append(double_field(16, score))
     for talent in character["talents"]:
         talent_fields = [Field.varint(1, talent["id"]), Field.varint(2, talent["quality"])]
@@ -81,7 +81,8 @@ def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: l
     return Message(fields)
 
 
-def append_body(document: SaveDocument, character: dict, strategy_ids: list[int], qualities: list[int], rules: dict) -> int:
+def append_body(document: SaveDocument, character: dict, strategy_ids: list[int], qualities: list[int], rules: dict,
+                *, score: int | None = None) -> int:
     model, pack = pack_from_save(document)
     entries = body_entries(pack)
     if len(entries) >= capacity(pack, rules):
@@ -89,7 +90,7 @@ def append_body(document: SaveDocument, character: dict, strategy_ids: list[int]
     uid = max([pack.get_varint(2), *(uid for uid, _ in entries)]) + 1
     if uid >= 1 << 32:
         raise ValueError("数据体编号已达到游戏格式上限")
-    score = rules["inherit_score"]
+    score = rules["inherit_score"] if score is None else score
     body = create_body(uid, character, strategy_ids, qualities, score)
     entry = Message([Field.varint(1, uid), Field.bytes(2, body.to_bytes())])
     pack = pack.replace(1, [*pack.fields(1), Field.bytes(1, entry.to_bytes())])
