@@ -18,8 +18,7 @@ class PlannerTests(unittest.TestCase):
         cls.planner = BuildPlanner(read('catalog.json'), read('planner_rules.json'), read('builds.json'))
 
     def test_lightning_chain_has_both_base_triggers_and_all_four_active(self):
-        build = self.planner.build_by_id['lightning-lance']
-        starters = self.planner.recommend_start(build.targets, build.starters)
+        starters = self.planner.recommend_start((3540, 3543), (2115, 3549, 3540, 3543))
         self.assertEqual(set(starters), {2115, 3549, 3540, 3543})
         self.assertEqual(set(self.planner.evaluate_start(starters).active_ids), set(starters))
 
@@ -55,8 +54,7 @@ assert not guides.describe_custom({'target_ids': [2253]}, [2253])['selection']['
         self.assertIn(6031, dict(activation.missing_labels)[3543])
 
     def test_fire_chain_is_active_with_skill_storm_and_inherit_fire_ring(self):
-        build = self.planner.build_by_id['storm-fire']
-        starters = self.planner.recommend_start(build.targets, build.starters)
+        starters = self.planner.recommend_start((2470, 2462), (3264, 2474, 2470, 2462))
         self.assertEqual(set(starters), {3264, 2474, 2470, 2462})
         self.assertEqual(len(self.planner.evaluate_start(starters).active_ids), 4)
 

@@ -6,9 +6,11 @@
 from __future__ import annotations
 
 from itertools import combinations
+from dataclasses import replace
 from time import monotonic
 
 from .planner_types import Activation, BuildDefinition, RouteSearchExpired
+from .strategy_activation import activate_strategies
 
 
 TRIGGER_NAMES = {1: '普攻', 2: '技能', 3: '冲刺', 4: '传承技', 5: '召唤'}
@@ -80,22 +82,8 @@ class BuildPlanner:
         return self._activate(starting_ids, ())
 
     def _activate(self, inherited: tuple[int, ...], acquired: tuple[int, ...]) -> Activation:
-        labels: set[int] = set()
-        active, missing = [], []
-        # 保留同层顺序，与游戏的四层扫描一致；不做虚构的标签降级或循环补全。
-        rows = [(strategy_id, True) for strategy_id in inherited]
-        rows.extend((strategy_id, False) for strategy_id in acquired)
-        rows.sort(key=lambda row: self.strategies[row[0]]['gradation'])
-        for strategy_id, is_inherited in rows:
-            strategy = self.strategies[strategy_id]
-            requirements = strategy['true_pre'] if is_inherited else strategy['pre_labels']
-            absent = tuple(label for label in requirements if label not in labels)
-            if absent:
-                missing.append((strategy_id, absent))
-            else:
-                active.append(strategy_id)
-                labels.update(strategy['labels'])
-        return Activation(tuple(active), frozenset(labels), tuple(missing), self._conflicts(inherited))
+        activation = activate_strategies(self.strategies, inherited, acquired)
+        return replace(activation, conflicts=self._conflicts(inherited))
 
     def _validate_ids(self, ids: tuple[int, ...]) -> None:
         if any(type(strategy_id) is not int or strategy_id not in self.strategies for strategy_id in ids):

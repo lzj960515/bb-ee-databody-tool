@@ -12,8 +12,9 @@ from datetime import datetime
 from pathlib import Path
 
 from .bodies import append_body, body_entries, capacity, double_value, nested, pack_from_save
-from .body_types import BodyRequest
+from .body_types import BodyContent, BodyRequest, BodyStrategy
 from .save_codec import SaveDocument
+from .strategy_activation import activate_strategies
 
 
 def digest(data: bytes) -> str:
@@ -98,8 +99,10 @@ class DataBodyService:
         raise ValueError("请选择有效的数据体颜色")
 
     def add_body(self, path: str | Path, character_id: int, strategy_ids: list[int], qualities: list[int],
-                 *, body_quality: int = 3) -> dict:
-        request = BodyRequest(character_id, tuple(strategy_ids), tuple(qualities), body_quality)
+                 *, body_quality: int = 3, owned_strategies: tuple[BodyStrategy, ...] | None = None,
+                 full_potentials: bool = False) -> dict:
+        request = BodyRequest(character_id, tuple(strategy_ids), tuple(qualities), body_quality,
+                              owned_strategies, full_potentials)
         result = self.add_bodies(path, [request])
         return {"uid": result["uids"][0], "backup_path": result["backup_path"], "count": result["count"]}
 
@@ -109,22 +112,47 @@ class DataBodyService:
         if not requests:
             raise ValueError("请至少选择一个要添加的数据体")
         scores = []
+        contents = []
         for request in requests:
             self._validate_selection(request.character_id, request.strategy_ids, request.qualities)
             scores.append(self._score_for_body_color(request.body_quality))
+            contents.append(self._prepare_body_content(request))
         original = self._current_save(path)
         document = SaveDocument.from_compressed(original)
         self._validate_batch_limits(document, len(requests))
         uids = []
-        for request, score in zip(requests, scores):
+        for request, score, content in zip(requests, scores, contents):
             character = self.characters[request.character_id]
             uid = append_body(document, character, request.strategy_ids, request.qualities,
-                              self.catalog["rules"], score=score)
+                              self.catalog["rules"], score=score, content=content)
             uids.append(uid)
         updated = document.to_compressed()
-        count = self._verify_created_bodies(updated, requests, uids, scores)
+        count = self._verify_created_bodies(updated, requests, uids, scores, contents)
         backup = self._commit(path, original, updated)
         return {"uids": uids, "backup_path": str(backup), "count": count}
+
+    def _prepare_body_content(self, request: BodyRequest) -> BodyContent:
+        inherited = tuple(BodyStrategy(i, q) for i, q in zip(request.strategy_ids, request.qualities))
+        owned = request.owned_strategies
+        if owned is None:
+            owned, active_ids = inherited, frozenset(request.strategy_ids)
+        else:
+            owned_ids = tuple(strategy.id for strategy in owned)
+            if len(owned_ids) != len(set(owned_ids)):
+                raise ValueError('自身策略不能重复')
+            for selection in owned:
+                strategy = self.strategies.get(selection.id)
+                if not strategy or selection.quality not in strategy['qualities']:
+                    raise ValueError('自身策略或品质不在当前游戏配置中')
+            if not set(inherited).issubset(owned):
+                raise ValueError('两项继承策略必须包含在自身策略中，且品质一致')
+            active_ids = frozenset(activate_strategies(self.strategies, (), owned_ids).active_ids)
+        character = self.characters[request.character_id]
+        potential_field = 'full_potentials' if request.full_potentials else 'potentials'
+        if request.full_potentials and not character.get(potential_field):
+            raise ValueError('当前目录缺少该角色的全潜能配置')
+        potential_ids = tuple(p['id'] for p in character.get(potential_field, []))
+        return BodyContent(owned, active_ids, potential_ids)
 
     def _validate_batch_limits(self, document: SaveDocument, count: int) -> None:
         _, pack = pack_from_save(document)
@@ -138,12 +166,12 @@ class DataBodyService:
             raise ValueError("数据体编号已达到游戏格式上限")
 
     def _verify_created_bodies(self, updated: bytes, requests: list[BodyRequest],
-                               uids: list[int], scores: list[int]) -> int:
+                               uids: list[int], scores: list[int], contents: list[BodyContent]) -> int:
         # 完整编码回读后核对每个数据体，再进入唯一的磁盘提交点。
         verified = SaveDocument.from_compressed(updated)
         _, pack = pack_from_save(verified)
         bodies = dict(body_entries(pack))
-        for request, uid, score in zip(requests, uids, scores):
+        for request, uid, score, content in zip(requests, uids, scores, contents):
             created = bodies.get(uid)
             if created is None or created.get_varint(2) != request.character_id:
                 raise ValueError("生成数据体的回读验证失败，原存档未修改")
@@ -151,6 +179,13 @@ class DataBodyService:
             expected = list(zip(request.strategy_ids, request.qualities))
             if selected != expected or double_value(created, 16) != score:
                 raise ValueError("生成数据体的回读验证失败，原存档未修改")
+            owned = [(nested(f).get_varint(1), nested(f).get_varint(2), nested(f).get_varint(3))
+                     for f in created.fields(8)]
+            expected_owned = [(s.id, s.quality, int(s.id in content.active_strategy_ids))
+                              for s in content.owned_strategies]
+            potentials = tuple(nested(f).get_varint(1) for f in created.fields(15))
+            if owned != expected_owned or potentials != content.potential_ids:
+                raise ValueError('生成数据体的潜能或自身策略回读验证失败，原存档未修改')
         return len(bodies)
 
     def _backup(self, path: Path, original: bytes) -> Path:

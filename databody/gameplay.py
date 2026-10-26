@@ -30,6 +30,10 @@ class GameplayGuideService:
             raise ValueError('请选择有效玩法')
         return self._describe(build, tuple(inherited_ids))
 
+    def describe_owned(self, strategy_ids: list[int]) -> dict:
+        # 单体是同一套目标规划；传给其他角色的两项策略不是本体的传入继承。
+        return self.describe_custom({'target_ids': strategy_ids})
+
     def describe_custom(self, definition: dict, inherited_ids=()) -> dict:
         """自定义只提供目标与偏好，取得条件仍由游戏规则求解。"""
         targets = self._strategy_ids(definition.get('target_ids', []))

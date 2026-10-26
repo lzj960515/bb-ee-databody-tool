@@ -1,0 +1,6 @@
+interface:
+  display_name: "数据体工具视频"
+  short_description: "使用个人自媒体工作台制作、修改苍翼数据体工具的演示视频"
+  default_prompt: "使用 $make-bb-ee-video，用我的工作台给这个项目做个演示视频。"
+policy:
+  allow_implicit_invocation: true

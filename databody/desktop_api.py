@@ -5,7 +5,7 @@ import json
 import threading
 from pathlib import Path
 
-from .body_types import BodyRequest
+from .body_types import BodyRequest, BodyStrategy
 from .custom_builds import CustomBuildStore
 from .planner import BuildPlanner
 from .service import DataBodyService, application_directory
@@ -32,6 +32,9 @@ class DesktopAPI:
 
     def describe_build(self, build_id: str, inherited_ids: list[int] | None = None) -> dict:
         return self._respond(self._describe_build, build_id, inherited_ids)
+
+    def describe_owned_strategies(self, strategy_ids: list[int]) -> dict:
+        return self._respond(self._describe_owned_strategies, strategy_ids)
 
     def list_custom_builds(self) -> dict:
         return self._respond_serialized(self._custom_builds.list_builds)
@@ -104,6 +107,11 @@ class DesktopAPI:
             raise ValueError("请选择有效策略")
         return self._get_guides().describe(build_id, inherited)
 
+    def _describe_owned_strategies(self, strategy_ids: list[int]) -> dict:
+        if not isinstance(strategy_ids, list):
+            raise ValueError('自身策略格式不正确')
+        return self._get_guides().describe_owned(strategy_ids)
+
     def _describe_custom_build(self, document: dict) -> dict:
         definition = self._custom_builds.validate(document, require_title=False)
         inherited = [slot["id"] for body in definition["bodies"] for slot in body["slots"] if slot is not None]
@@ -152,7 +160,22 @@ class DesktopAPI:
             raise ValueError("请为每个数据体选择两项策略")
         if any(type(value) is not int for value in [*strategy_ids, *qualities]):
             raise ValueError("请选择有效策略和品质")
-        return BodyRequest(character_id, tuple(strategy_ids), tuple(qualities), body_quality)
+        full_potentials = request.get('full_potentials', False)
+        if type(full_potentials) is not bool:
+            raise ValueError('潜能配置格式不正确')
+        owned = self._owned_strategies(request.get('owned_strategies'))
+        return BodyRequest(character_id, tuple(strategy_ids), tuple(qualities), body_quality,
+                           owned, full_potentials)
+
+    def _owned_strategies(self, values) -> tuple[BodyStrategy, ...] | None:
+        if values is None:
+            return None
+        if not isinstance(values, list) or any(
+            not isinstance(row, dict) or type(row.get('id')) is not int or type(row.get('quality')) is not int
+            for row in values
+        ):
+            raise ValueError('自身策略格式不正确')
+        return tuple(BodyStrategy(row['id'], row['quality']) for row in values)
 
     def _validate_pair(self, bodies: list[BodyRequest]) -> None:
         if bodies[0].character_id == bodies[1].character_id:

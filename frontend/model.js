@@ -72,7 +72,8 @@
           return [body, slot];
         }
       }
-      throw new Error("四项已选满。点击下方策略槽，选择要替换的位置。");
+      const capacity = this.bodies.length === 1 ? "两项" : "四项";
+      throw new Error(`${capacity}已选满。点击下方策略槽，选择要替换的位置。`);
     }
     set(body, slot, id, quality) {
       const existing = this.locate(id);
@@ -98,6 +99,49 @@
         body_quality: body.body_quality,
         strategy_ids: body.slots.map((slot) => slot.id),
         qualities: body.slots.map((slot) => slot.quality),
+      }));
+    }
+  }
+  class SingleBodyEditor extends BodyEditor {
+    constructor() {
+      super(1);
+      this.owned = [];
+      this.fullPotentials = false;
+    }
+    setOwned(id, quality) {
+      const existing = this.owned.find((row) => row.id === id);
+      if (existing) existing.quality = quality;
+      else this.owned.push({ id, quality });
+      const location = this.locate(id);
+      if (location) super.set(...location, id, quality);
+    }
+    removeOwned(id) {
+      this.owned = this.owned.filter((row) => row.id !== id);
+      const location = this.locate(id);
+      if (location) this.remove(...location);
+    }
+    set(body, slot, id, quality) {
+      super.set(body, slot, id, quality);
+      this.setOwned(id, quality);
+    }
+    ownedQuality(id) {
+      return this.owned.find((row) => row.id === id)?.quality || 4;
+    }
+    resolvedOwned(guide) {
+      if (!guide) throw new Error("请等待策略计算完成。");
+      if (guide.selection.errors.length)
+        throw new Error(guide.selection.errors.join("；"));
+      if (this.owned.some((row) => !guide.strategy_ids.includes(row.id)))
+        throw new Error("策略已变化，请等待重新计算。");
+      return guide.strategy_ids.map((id) => ({id, quality: this.ownedQuality(id)}));
+    }
+    requests(guide) {
+      const requests = super.requests();
+      const owned = this.resolvedOwned(guide);
+      return requests.map((request) => ({
+        ...request,
+        owned_strategies: copy(owned),
+        full_potentials: this.fullPotentials,
       }));
     }
   }
@@ -185,6 +229,7 @@
       CustomBuildDraft,
       GuideRequestQueue,
       StrategyPickerModel,
+      SingleBodyEditor,
     };
   else
     root.DataBodyModel = {
@@ -192,5 +237,6 @@
       CustomBuildDraft,
       GuideRequestQueue,
       StrategyPickerModel,
+      SingleBodyEditor,
     };
 })(globalThis);

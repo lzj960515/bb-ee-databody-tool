@@ -9,6 +9,8 @@ from unittest.mock import Mock, patch
 
 from databody.desktop_api import DesktopAPI
 from databody.service import DataBodyService
+from databody.save_codec import SaveDocument
+from databody.bodies import body_entries, nested, pack_from_save
 from test_service import CATALOG, sample_save
 
 
@@ -46,6 +48,32 @@ class DesktopAPITests(unittest.TestCase):
                  "qualities": [4, 3], "body_quality": 3},
                 {"character_id": 102101, "strategy_ids": [2226, 2227],
                  "qualities": [3, 4], "body_quality": 4}]
+
+    def test_single_full_body_passes_owned_strategies_and_potentials_to_save(self):
+        self.service.characters[101101]['full_potentials'] = [{'id': 6001}, {'id': 6002}]
+        request = self.requests()[0]
+        request.update(full_potentials=True, owned_strategies=[
+            {'id': 2113, 'quality': 4}, {'id': 2120, 'quality': 3}, {'id': 2226, 'quality': 2}])
+        self.api.load_save(str(self.path))
+        result = self.api.save_bodies([request])
+        self.assertTrue(result['ok'], result)
+        _, pack = pack_from_save(SaveDocument.from_compressed(self.path.read_bytes()))
+        body = dict(body_entries(pack))[result['data']['uids'][0]]
+        self.assertEqual([nested(f).get_varint(1) for f in body.fields(8)], [2113, 2120, 2226])
+        self.assertEqual([nested(f).get_varint(1) for f in body.fields(30)], [2113, 2120])
+        self.assertEqual([nested(f).get_varint(1) for f in body.fields(15)], [6001, 6002])
+
+    def test_malformed_owned_selection_is_rejected_without_write(self):
+        self.api.load_save(str(self.path))
+        for owned in ('all', [None], [{'id': True, 'quality': 4}], [{'id': 2113, 'quality': '4'}], []):
+            request = self.requests()[0]
+            request['owned_strategies'] = owned
+            self.assertFalse(self.api.save_bodies([request])['ok'])
+            self.assert_unchanged()
+        request = self.requests()[0]
+        request['full_potentials'] = 'yes'
+        self.assertFalse(self.api.save_bodies([request])['ok'])
+        self.assert_unchanged()
 
     def assert_unchanged(self, expected=None):
         self.assertEqual(self.path.read_bytes(), self.original if expected is None else expected)
@@ -141,6 +169,20 @@ class DesktopAPITests(unittest.TestCase):
         result = self.api.save_bodies(self.requests())
         self.assertFalse(result["ok"])
         self.assertIn("载入", result["error"])
+        self.assert_unchanged()
+
+    def test_owned_preview_uses_normal_prerequisites_without_loading_or_writing_save(self):
+        # 与自定义玩法共用完整规划，目录和真实存档保持独立。
+        resources = Path(__file__).resolve().parent.parent
+        api = DesktopAPI(DataBodyService(resources / 'data/catalog.json'),
+                         resource_directory=resources, user_data_directory=self.personal_directory)
+        result = api.describe_owned_strategies([2253, 2226])
+        self.assertTrue(result['ok'], result)
+        self.assertEqual(result['data']['selection']['errors'], [])
+        self.assertTrue({2253, 2226, 2227, 2248}.issubset(result['data']['strategy_ids']))
+        self.assertEqual(result['data']['selection']['inherited_ids'], [])
+        self.assertFalse(api.describe_owned_strategies('all')['ok'])
+        self.assertFalse(api.describe_owned_strategies([True])['ok'])
         self.assert_unchanged()
 
     def test_explicit_load_then_pair_writes_one_backup_and_returns_updated_save(self):

@@ -15,6 +15,7 @@ import lz4.frame
 from databody.bodies import append_body, body_entries, create_body, pack_from_save
 from databody.save_codec import Field, Message, SaveDocument
 from databody.service import DataBodyService
+from databody.body_types import BodyStrategy
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -115,6 +116,21 @@ const result = input.records.map(record => {
   const error = type.verify(decoded);
   if (error) throw new Error(error);
   const output = type.toObject(decoded, {defaults: true, longs: String, bytes: String});
+  if (record.refreshOwned) {
+    const actorSource = fs.readFileSync(input.replayPaths.actor, 'utf8');
+    const start = actorSource.indexOf('function RefreshBlessActive(');
+    const end = actorSource.indexOf('function GetFesActorAttrByType(', start);
+    if (start < 0 || end < 0) throw new Error('Original activation method missing');
+    const configs = JSON.parse(fs.readFileSync(input.replayPaths.configs + '/BlessConf.json', 'utf8'));
+    const context = vm.createContext({P,
+      Xlsx_1: {Xlsx: {BlessConf: {Get(id) {return P.BlessConf.fromObject(configs.find(row => row.id === id));}}}},
+      Bless_1: {BlessUtils: {BLESS_SPECIAL_SOURCE: [P.EBreedDungeonBlessSource.Master, P.EBreedDungeonBlessSource.Special]}},
+      Quest_1: {QuestUtil: {CheckTarget() {}}}, Task_1: {TaskUtil: {CheckTask() {}}},
+    });
+    const refresh = vm.runInContext('(' + actorSource.slice(start, end).trim() + ')', context);
+    refresh(decoded.blesses);
+    output.refreshedOwned = decoded.blesses.map(row => ({id: row.id, quality: row.quality, active: row.active}));
+  }
   if (record.replay) output.inheritanceReplay = replayInheritance(decoded);
   return output;
 });
@@ -223,6 +239,39 @@ class GameSchemaOracleTests(unittest.TestCase):
                 self.assertEqual(inherited["talents"], [{"id": character["talents"][0]["id"],
                                                         "quality": character["talents"][0]["quality"],
                                                         "fromActorId": character["id"]}])
+
+    def test_full_bodies_decode_and_preserve_game_activation_and_two_item_inheritance(self):
+        potentials = json.loads((ROOT / 'research/resources/configs/BaseActorPotentialConf.json').read_text(encoding='utf-8'))
+        with tempfile.TemporaryDirectory(prefix='bb-ee-full-body-') as directory:
+            path = Path(directory) / 'Save/4'
+            path.parent.mkdir()
+            path.write_bytes(sample_document().to_compressed())
+            service = DataBodyService()
+            service.load_save(path)
+            records = []
+            for character in CATALOG['characters']:
+                # 高阶排前面，原始游戏仍按层级扫描；2253缺前置应保持未激活。
+                owned = (BodyStrategy(2253, 4), BodyStrategy(2227, 3), BodyStrategy(2226, 4))
+                with patch.object(service, 'game_running', return_value=False):
+                    result = service.add_body(path, character['id'], [2226, 2227], [4, 3],
+                                              owned_strategies=owned, full_potentials=True)
+                _, pack = pack_from_save(SaveDocument.from_compressed(path.read_bytes()))
+                record = self.record('STFesActor', dict(body_entries(pack))[result['uid']].to_bytes())
+                record.update(replay=True, refreshOwned=True)
+                records.append(record)
+            for character, actor in zip(CATALOG['characters'], self.decode(records, replay=True)):
+                with self.subTest(character=character['id']):
+                    expected_ids = {p['id'] for p in potentials if p.get('actorId') == character['id'] and not p.get('invalid')}
+                    self.assertEqual({p['id'] for p in actor['potentials']}, expected_ids)
+                    self.assertEqual(len(actor['potentials']), len(expected_ids))
+                    expected_owned = [{'id': 2253, 'quality': 4, 'active': False},
+                                      {'id': 2227, 'quality': 3, 'active': True},
+                                      {'id': 2226, 'quality': 4, 'active': True}]
+                    self.assertEqual(actor['refreshedOwned'], expected_owned)
+                    self.assertEqual([(r['id'], r['quality'], r['active']) for r in actor['blesses']],
+                                     [(r['id'], r['quality'], r['active']) for r in expected_owned])
+                    self.assertEqual(actor['inheritanceReplay']['strategies'],
+                                     [{'id': 2226, 'quality': 4}, {'id': 2227, 'quality': 3}])
 
     def test_selected_colors_match_original_color_and_inheritance_rules(self):
         records = []

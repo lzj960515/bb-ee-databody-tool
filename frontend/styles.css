@@ -532,6 +532,7 @@ button:hover:not(:disabled) {
   border-radius: 5px;
 }
 .strategy-card {
+  position: relative;
   border: 1px solid var(--line);
   border-left: 3px solid var(--element-color, #8c9bb1);
   border-radius: 5px;
@@ -794,14 +795,17 @@ button:hover:not(:disabled) {
 .single-page {
   height: 100%;
   overflow: auto;
-  padding: 40px 32px;
+  padding: 28px 32px;
 }
 .single-layout {
-  max-width: 840px;
+  max-width: 1500px;
   margin: 0 auto;
 }
-.single-layout > h1 {
-  margin-bottom: 25px;
+.single-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 .single-form {
   padding: 26px;
@@ -811,7 +815,7 @@ button:hover:not(:disabled) {
 }
 .single-form .body-heading {
   gap: 16px;
-  margin-bottom: 22px;
+  margin-bottom: 0;
 }
 .single-form .body-heading h3 {
   display: none;
@@ -827,31 +831,107 @@ button:hover:not(:disabled) {
   margin-left: 0;
 }
 .single-form .body-slot {
-  min-height: 100px;
-  padding: 18px;
+  min-height: 88px;
+  padding: 14px;
 }
 .single-form .slot-main strong {
-  font-size: 17px;
+  font-size: 15px;
 }
 .single-form .slot-main > span {
-  margin-top: 8px;
+  margin-top: 5px;
   font-size: 13px;
 }
 .single-form .dock-footer {
-  margin-top: 25px;
+  margin-top: 20px;
+  justify-content: space-between;
 }
 .slot-description {
   font-size: 14px;
   line-height: 1.8;
   color: var(--muted);
-  margin-top: 14px;
+  margin-top: 8px;
 }
 .single-form .body-slot {
   align-items: flex-start;
-  min-height: 135px;
 }
 .single-form .slot-remove {
   align-self: flex-start;
+}
+.owned-editor {
+  margin: 24px 0;
+  padding: 22px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.collection-count {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 10px;
+  font-weight: 400;
+}
+.owned-editor .strategy-title {
+  padding-right: 15px;
+}
+.strategy-remove {
+  position: absolute;
+  top: 6px;
+  right: 5px;
+  padding: 0 4px;
+  font-size: 16px;
+  color: var(--muted);
+}
+.unassigned-heading {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.potential-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.potential-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+.potential-option input {
+  appearance: none;
+  position: relative;
+  width: 36px;
+  height: 21px;
+  padding: 0;
+  margin: 0;
+  flex: none;
+  border: 0;
+  border-radius: 12px;
+  background: #b9c3d3;
+  cursor: pointer;
+}
+.potential-option input::before {
+  content: "";
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: white;
+  top: 3px;
+  left: 3px;
+}
+.potential-option input:checked {
+  background: var(--blue);
+}
+.potential-option input:checked::before {
+  left: 18px;
+}
+.single-inheritance .section-heading {
+  margin-bottom: 12px;
+}
+.confirm-body h4 {
+  font-size: 14px;
+  margin: 16px 0 6px;
 }
 .strategy-modal {
   width: 650px;

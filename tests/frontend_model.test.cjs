@@ -5,7 +5,63 @@ const {
   CustomBuildDraft,
   GuideRequestQueue,
   StrategyPickerModel,
+  SingleBodyEditor,
 } = require("../frontend/model.js");
+
+const guide = (ids) => ({ strategy_ids: ids, selection: { errors: [] } });
+
+test("单体写入包含自动前置，品质与继承同步，自动项不永久污染目标", () => {
+  const single = new SingleBodyEditor();
+  single.bodies[0].character_id = 100101;
+  single.setOwned(2253, 3);
+  single.setOwned(2226, 4);
+  single.set(0, 0, 2253, 3);
+  single.set(0, 1, 2226, 4);
+  single.setOwned(2253, 2);
+  assert.equal(single.bodies[0].slots[0].quality, 2);
+  const planned = guide([2226,2227,2248,2168,2253]);
+  const request = single.requests(planned)[0];
+  assert.equal(request.full_potentials, false);
+  assert.deepEqual(request.owned_strategies, [
+    {id:2226,quality:4}, {id:2227,quality:4}, {id:2248,quality:4},
+    {id:2168,quality:4}, {id:2253,quality:2},
+  ]);
+  assert.deepEqual(single.owned.map(row => row.id), [2253,2226]);
+  assert.deepEqual(request.strategy_ids, [2253,2226]);
+  single.setOwned(2248, 3);
+  assert.equal(single.requests(planned)[0].owned_strategies.find(row => row.id===2248).quality, 3);
+  single.removeOwned(2253);
+  assert.equal(single.locate(2253), null);
+  assert.throws(() => single.requests(planned), /两项/);
+  single.set(0, 0, 2248, 3);
+  const updated = single.requests(guide([2226,2227,2248]))[0];
+  assert.ok(!updated.owned_strategies.some(row => row.id===2168));
+});
+
+test("单体计算尚未完成、冲突或过期时不能写入未补齐的策略", () => {
+  const single = new SingleBodyEditor();
+  single.bodies[0].character_id = 100101;
+  single.add(2253,4); single.add(2226,4);
+  assert.throws(() => single.requests(null), /计算/);
+  assert.throws(() => single.requests({strategy_ids:[2253,2226],selection:{errors:['技能位冲突']}}), /技能位冲突/);
+  assert.throws(() => single.requests(guide([2226])), /计算/);
+});
+
+test("全潜能默认关闭，切换只改变潜能选择并跟随当前角色", () => {
+  const single = new SingleBodyEditor();
+  single.bodies[0].character_id = 100101;
+  single.add(2226,4); single.add(2227,3);
+  assert.throws(() => single.add(2253,4), /两项已选满/);
+  const planned = guide([2226,2227]);
+  const original = single.requests(planned)[0];
+  assert.equal(original.full_potentials,false);
+  single.fullPotentials = true;
+  assert.deepEqual(single.requests(planned)[0], {...original, full_potentials:true});
+  single.bodies[0].character_id = 103501;
+  assert.equal(single.requests(planned)[0].character_id, 103501);
+  single.fullPotentials = false;
+  assert.deepEqual(single.requests(planned)[0], {...original, character_id:103501});
+});
 
 function deferred() {
   let resolve, reject;

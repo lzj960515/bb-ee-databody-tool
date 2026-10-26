@@ -45,7 +45,126 @@
         1029011
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 5900
+        },
+        {
+          "id": 5901
+        },
+        {
+          "id": 5902
+        },
+        {
+          "id": 5903
+        },
+        {
+          "id": 5904
+        },
+        {
+          "id": 5905
+        },
+        {
+          "id": 5906
+        },
+        {
+          "id": 5907
+        },
+        {
+          "id": 5908
+        },
+        {
+          "id": 5909
+        },
+        {
+          "id": 5910
+        },
+        {
+          "id": 5911
+        },
+        {
+          "id": 5912
+        },
+        {
+          "id": 5913
+        },
+        {
+          "id": 5914
+        },
+        {
+          "id": 5915
+        },
+        {
+          "id": 5916
+        },
+        {
+          "id": 5917
+        },
+        {
+          "id": 5918
+        },
+        {
+          "id": 5919
+        },
+        {
+          "id": 5920
+        },
+        {
+          "id": 5921
+        },
+        {
+          "id": 5922
+        },
+        {
+          "id": 5923
+        },
+        {
+          "id": 5924
+        },
+        {
+          "id": 5925
+        },
+        {
+          "id": 5926
+        },
+        {
+          "id": 5927
+        },
+        {
+          "id": 5929
+        },
+        {
+          "id": 5930
+        },
+        {
+          "id": 5931
+        },
+        {
+          "id": 5932
+        },
+        {
+          "id": 5933
+        },
+        {
+          "id": 5934
+        },
+        {
+          "id": 5935
+        },
+        {
+          "id": 5936
+        },
+        {
+          "id": 5937
+        },
+        {
+          "id": 5939
+        },
+        {
+          "id": 5940
+        }
+      ]
     },
     {
       "id": 100101,
@@ -90,7 +209,108 @@
         1001012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 5300
+        },
+        {
+          "id": 5301
+        },
+        {
+          "id": 5303
+        },
+        {
+          "id": 5304
+        },
+        {
+          "id": 5305
+        },
+        {
+          "id": 5306
+        },
+        {
+          "id": 5334
+        },
+        {
+          "id": 5307
+        },
+        {
+          "id": 5308
+        },
+        {
+          "id": 5333
+        },
+        {
+          "id": 5309
+        },
+        {
+          "id": 5311
+        },
+        {
+          "id": 5312
+        },
+        {
+          "id": 5313
+        },
+        {
+          "id": 5314
+        },
+        {
+          "id": 5315
+        },
+        {
+          "id": 5316
+        },
+        {
+          "id": 5317
+        },
+        {
+          "id": 5318
+        },
+        {
+          "id": 5320
+        },
+        {
+          "id": 5321
+        },
+        {
+          "id": 5322
+        },
+        {
+          "id": 5324
+        },
+        {
+          "id": 5325
+        },
+        {
+          "id": 5326
+        },
+        {
+          "id": 5327
+        },
+        {
+          "id": 5328
+        },
+        {
+          "id": 5329
+        },
+        {
+          "id": 5330
+        },
+        {
+          "id": 5331
+        },
+        {
+          "id": 5332
+        },
+        {
+          "id": 5310
+        },
+        {
+          "id": 5340
+        }
+      ]
     },
     {
       "id": 100301,
@@ -135,7 +355,96 @@
         1003013
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 5501
+        },
+        {
+          "id": 5502
+        },
+        {
+          "id": 5506
+        },
+        {
+          "id": 5503
+        },
+        {
+          "id": 5505
+        },
+        {
+          "id": 5504
+        },
+        {
+          "id": 5527
+        },
+        {
+          "id": 5512
+        },
+        {
+          "id": 5513
+        },
+        {
+          "id": 5514
+        },
+        {
+          "id": 5515
+        },
+        {
+          "id": 5516
+        },
+        {
+          "id": 5517
+        },
+        {
+          "id": 5518
+        },
+        {
+          "id": 5528
+        },
+        {
+          "id": 5519
+        },
+        {
+          "id": 5520
+        },
+        {
+          "id": 5521
+        },
+        {
+          "id": 5523
+        },
+        {
+          "id": 5522
+        },
+        {
+          "id": 5529
+        },
+        {
+          "id": 5500
+        },
+        {
+          "id": 5525
+        },
+        {
+          "id": 5526
+        },
+        {
+          "id": 5508
+        },
+        {
+          "id": 5530
+        },
+        {
+          "id": 5511
+        },
+        {
+          "id": 5524
+        },
+        {
+          "id": 5540
+        }
+      ]
     },
     {
       "id": 102801,
@@ -180,7 +489,114 @@
         1028012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 5700
+        },
+        {
+          "id": 5701
+        },
+        {
+          "id": 5702
+        },
+        {
+          "id": 5703
+        },
+        {
+          "id": 5704
+        },
+        {
+          "id": 5705
+        },
+        {
+          "id": 5706
+        },
+        {
+          "id": 5707
+        },
+        {
+          "id": 5708
+        },
+        {
+          "id": 5709
+        },
+        {
+          "id": 5710
+        },
+        {
+          "id": 5711
+        },
+        {
+          "id": 5712
+        },
+        {
+          "id": 5713
+        },
+        {
+          "id": 5714
+        },
+        {
+          "id": 5715
+        },
+        {
+          "id": 5716
+        },
+        {
+          "id": 5717
+        },
+        {
+          "id": 5718
+        },
+        {
+          "id": 5719
+        },
+        {
+          "id": 5720
+        },
+        {
+          "id": 5721
+        },
+        {
+          "id": 5722
+        },
+        {
+          "id": 5723
+        },
+        {
+          "id": 5724
+        },
+        {
+          "id": 5725
+        },
+        {
+          "id": 5726
+        },
+        {
+          "id": 5727
+        },
+        {
+          "id": 5728
+        },
+        {
+          "id": 5729
+        },
+        {
+          "id": 5730
+        },
+        {
+          "id": 5731
+        },
+        {
+          "id": 5732
+        },
+        {
+          "id": 5733
+        },
+        {
+          "id": 5740
+        }
+      ]
     },
     {
       "id": 103401,
@@ -225,7 +641,93 @@
         1034012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 5600
+        },
+        {
+          "id": 5601
+        },
+        {
+          "id": 5602
+        },
+        {
+          "id": 5603
+        },
+        {
+          "id": 5604
+        },
+        {
+          "id": 5605
+        },
+        {
+          "id": 5606
+        },
+        {
+          "id": 5607
+        },
+        {
+          "id": 5608
+        },
+        {
+          "id": 5609
+        },
+        {
+          "id": 5610
+        },
+        {
+          "id": 5612
+        },
+        {
+          "id": 5613
+        },
+        {
+          "id": 5614
+        },
+        {
+          "id": 5615
+        },
+        {
+          "id": 5616
+        },
+        {
+          "id": 5617
+        },
+        {
+          "id": 5618
+        },
+        {
+          "id": 5619
+        },
+        {
+          "id": 5620
+        },
+        {
+          "id": 5621
+        },
+        {
+          "id": 5622
+        },
+        {
+          "id": 5623
+        },
+        {
+          "id": 5624
+        },
+        {
+          "id": 5625
+        },
+        {
+          "id": 5626
+        },
+        {
+          "id": 5627
+        },
+        {
+          "id": 5640
+        }
+      ]
     },
     {
       "id": 100401,
@@ -270,7 +772,144 @@
         1004012
       ],
       "steam_dlc_id": 3085820,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6400
+        },
+        {
+          "id": 6401
+        },
+        {
+          "id": 6402
+        },
+        {
+          "id": 6403
+        },
+        {
+          "id": 6404
+        },
+        {
+          "id": 6405
+        },
+        {
+          "id": 6406
+        },
+        {
+          "id": 6407
+        },
+        {
+          "id": 6408
+        },
+        {
+          "id": 6409
+        },
+        {
+          "id": 6410
+        },
+        {
+          "id": 6411
+        },
+        {
+          "id": 6413
+        },
+        {
+          "id": 6414
+        },
+        {
+          "id": 6415
+        },
+        {
+          "id": 6416
+        },
+        {
+          "id": 6417
+        },
+        {
+          "id": 6418
+        },
+        {
+          "id": 6419
+        },
+        {
+          "id": 6420
+        },
+        {
+          "id": 6421
+        },
+        {
+          "id": 6422
+        },
+        {
+          "id": 6423
+        },
+        {
+          "id": 6424
+        },
+        {
+          "id": 6425
+        },
+        {
+          "id": 6426
+        },
+        {
+          "id": 6427
+        },
+        {
+          "id": 6428
+        },
+        {
+          "id": 6429
+        },
+        {
+          "id": 6430
+        },
+        {
+          "id": 6431
+        },
+        {
+          "id": 6432
+        },
+        {
+          "id": 6433
+        },
+        {
+          "id": 6434
+        },
+        {
+          "id": 6435
+        },
+        {
+          "id": 6436
+        },
+        {
+          "id": 6437
+        },
+        {
+          "id": 6438
+        },
+        {
+          "id": 6439
+        },
+        {
+          "id": 6440
+        },
+        {
+          "id": 6441
+        },
+        {
+          "id": 6442
+        },
+        {
+          "id": 6444
+        },
+        {
+          "id": 6445
+        },
+        {
+          "id": 6446
+        }
+      ]
     },
     {
       "id": 100501,
@@ -315,7 +954,111 @@
         1005012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6300
+        },
+        {
+          "id": 6315
+        },
+        {
+          "id": 6319
+        },
+        {
+          "id": 6301
+        },
+        {
+          "id": 6322
+        },
+        {
+          "id": 6346
+        },
+        {
+          "id": 6308
+        },
+        {
+          "id": 6317
+        },
+        {
+          "id": 6333
+        },
+        {
+          "id": 6334
+        },
+        {
+          "id": 6336
+        },
+        {
+          "id": 6337
+        },
+        {
+          "id": 6338
+        },
+        {
+          "id": 6305
+        },
+        {
+          "id": 6331
+        },
+        {
+          "id": 6332
+        },
+        {
+          "id": 6307
+        },
+        {
+          "id": 6339
+        },
+        {
+          "id": 6340
+        },
+        {
+          "id": 6348
+        },
+        {
+          "id": 6311
+        },
+        {
+          "id": 6303
+        },
+        {
+          "id": 6309
+        },
+        {
+          "id": 6313
+        },
+        {
+          "id": 6306
+        },
+        {
+          "id": 6312
+        },
+        {
+          "id": 6314
+        },
+        {
+          "id": 6304
+        },
+        {
+          "id": 6326
+        },
+        {
+          "id": 6324
+        },
+        {
+          "id": 6323
+        },
+        {
+          "id": 6316
+        },
+        {
+          "id": 6302
+        },
+        {
+          "id": 6341
+        }
+      ]
     },
     {
       "id": 100201,
@@ -360,7 +1103,111 @@
         1002012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 5400
+        },
+        {
+          "id": 5401
+        },
+        {
+          "id": 5402
+        },
+        {
+          "id": 5403
+        },
+        {
+          "id": 5404
+        },
+        {
+          "id": 5405
+        },
+        {
+          "id": 5434
+        },
+        {
+          "id": 5406
+        },
+        {
+          "id": 5407
+        },
+        {
+          "id": 5408
+        },
+        {
+          "id": 5409
+        },
+        {
+          "id": 5410
+        },
+        {
+          "id": 5411
+        },
+        {
+          "id": 5412
+        },
+        {
+          "id": 5413
+        },
+        {
+          "id": 5414
+        },
+        {
+          "id": 5415
+        },
+        {
+          "id": 5416
+        },
+        {
+          "id": 5417
+        },
+        {
+          "id": 5418
+        },
+        {
+          "id": 5419
+        },
+        {
+          "id": 5420
+        },
+        {
+          "id": 5421
+        },
+        {
+          "id": 5424
+        },
+        {
+          "id": 5425
+        },
+        {
+          "id": 5426
+        },
+        {
+          "id": 5427
+        },
+        {
+          "id": 5428
+        },
+        {
+          "id": 5429
+        },
+        {
+          "id": 5430
+        },
+        {
+          "id": 5433
+        },
+        {
+          "id": 5431
+        },
+        {
+          "id": 5432
+        },
+        {
+          "id": 5440
+        }
+      ]
     },
     {
       "id": 102501,
@@ -405,7 +1252,102 @@
         1025013
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 5800
+        },
+        {
+          "id": 5801
+        },
+        {
+          "id": 5802
+        },
+        {
+          "id": 5803
+        },
+        {
+          "id": 5832
+        },
+        {
+          "id": 5833
+        },
+        {
+          "id": 5806
+        },
+        {
+          "id": 5807
+        },
+        {
+          "id": 5808
+        },
+        {
+          "id": 5809
+        },
+        {
+          "id": 5810
+        },
+        {
+          "id": 5811
+        },
+        {
+          "id": 5812
+        },
+        {
+          "id": 5813
+        },
+        {
+          "id": 5814
+        },
+        {
+          "id": 5815
+        },
+        {
+          "id": 5817
+        },
+        {
+          "id": 5818
+        },
+        {
+          "id": 5819
+        },
+        {
+          "id": 5820
+        },
+        {
+          "id": 5821
+        },
+        {
+          "id": 5822
+        },
+        {
+          "id": 5823
+        },
+        {
+          "id": 5824
+        },
+        {
+          "id": 5825
+        },
+        {
+          "id": 5826
+        },
+        {
+          "id": 5827
+        },
+        {
+          "id": 5829
+        },
+        {
+          "id": 5830
+        },
+        {
+          "id": 5831
+        },
+        {
+          "id": 5840
+        }
+      ]
     },
     {
       "id": 101101,
@@ -450,7 +1392,102 @@
         1011012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6000
+        },
+        {
+          "id": 6001
+        },
+        {
+          "id": 6002
+        },
+        {
+          "id": 6003
+        },
+        {
+          "id": 6004
+        },
+        {
+          "id": 6005
+        },
+        {
+          "id": 6006
+        },
+        {
+          "id": 6007
+        },
+        {
+          "id": 6008
+        },
+        {
+          "id": 6009
+        },
+        {
+          "id": 6010
+        },
+        {
+          "id": 6011
+        },
+        {
+          "id": 6012
+        },
+        {
+          "id": 6013
+        },
+        {
+          "id": 6015
+        },
+        {
+          "id": 6016
+        },
+        {
+          "id": 6017
+        },
+        {
+          "id": 6018
+        },
+        {
+          "id": 6019
+        },
+        {
+          "id": 6020
+        },
+        {
+          "id": 6021
+        },
+        {
+          "id": 6022
+        },
+        {
+          "id": 6023
+        },
+        {
+          "id": 6024
+        },
+        {
+          "id": 6026
+        },
+        {
+          "id": 6027
+        },
+        {
+          "id": 6028
+        },
+        {
+          "id": 6029
+        },
+        {
+          "id": 6030
+        },
+        {
+          "id": 6031
+        },
+        {
+          "id": 6040
+        }
+      ]
     },
     {
       "id": 103501,
@@ -495,7 +1532,87 @@
         1035012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6101
+        },
+        {
+          "id": 6112
+        },
+        {
+          "id": 6109
+        },
+        {
+          "id": 6114
+        },
+        {
+          "id": 6123
+        },
+        {
+          "id": 6145
+        },
+        {
+          "id": 6146
+        },
+        {
+          "id": 6100
+        },
+        {
+          "id": 6102
+        },
+        {
+          "id": 6106
+        },
+        {
+          "id": 6108
+        },
+        {
+          "id": 6124
+        },
+        {
+          "id": 6125
+        },
+        {
+          "id": 6126
+        },
+        {
+          "id": 6107
+        },
+        {
+          "id": 6110
+        },
+        {
+          "id": 6122
+        },
+        {
+          "id": 6111
+        },
+        {
+          "id": 6141
+        },
+        {
+          "id": 6140
+        },
+        {
+          "id": 6143
+        },
+        {
+          "id": 6113
+        },
+        {
+          "id": 6104
+        },
+        {
+          "id": 6105
+        },
+        {
+          "id": 6147
+        },
+        {
+          "id": 6142
+        }
+      ]
     },
     {
       "id": 101401,
@@ -540,7 +1657,102 @@
         1014012
       ],
       "steam_dlc_id": 3422870,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6600
+        },
+        {
+          "id": 6601
+        },
+        {
+          "id": 6602
+        },
+        {
+          "id": 6603
+        },
+        {
+          "id": 6604
+        },
+        {
+          "id": 6605
+        },
+        {
+          "id": 6606
+        },
+        {
+          "id": 6607
+        },
+        {
+          "id": 6608
+        },
+        {
+          "id": 6609
+        },
+        {
+          "id": 6610
+        },
+        {
+          "id": 6611
+        },
+        {
+          "id": 6612
+        },
+        {
+          "id": 6613
+        },
+        {
+          "id": 6614
+        },
+        {
+          "id": 6615
+        },
+        {
+          "id": 6616
+        },
+        {
+          "id": 6617
+        },
+        {
+          "id": 6618
+        },
+        {
+          "id": 6619
+        },
+        {
+          "id": 6620
+        },
+        {
+          "id": 6621
+        },
+        {
+          "id": 6622
+        },
+        {
+          "id": 6623
+        },
+        {
+          "id": 6624
+        },
+        {
+          "id": 6625
+        },
+        {
+          "id": 6626
+        },
+        {
+          "id": 6627
+        },
+        {
+          "id": 6628
+        },
+        {
+          "id": 6629
+        },
+        {
+          "id": 6640
+        }
+      ]
     },
     {
       "id": 103701,
@@ -589,7 +1801,108 @@
         1037012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6500
+        },
+        {
+          "id": 6501
+        },
+        {
+          "id": 6502
+        },
+        {
+          "id": 6503
+        },
+        {
+          "id": 6504
+        },
+        {
+          "id": 6505
+        },
+        {
+          "id": 6506
+        },
+        {
+          "id": 6507
+        },
+        {
+          "id": 6508
+        },
+        {
+          "id": 6509
+        },
+        {
+          "id": 6510
+        },
+        {
+          "id": 6511
+        },
+        {
+          "id": 6512
+        },
+        {
+          "id": 6513
+        },
+        {
+          "id": 6514
+        },
+        {
+          "id": 6515
+        },
+        {
+          "id": 6516
+        },
+        {
+          "id": 6517
+        },
+        {
+          "id": 6518
+        },
+        {
+          "id": 6519
+        },
+        {
+          "id": 6520
+        },
+        {
+          "id": 6521
+        },
+        {
+          "id": 6522
+        },
+        {
+          "id": 6523
+        },
+        {
+          "id": 6524
+        },
+        {
+          "id": 6525
+        },
+        {
+          "id": 6526
+        },
+        {
+          "id": 6527
+        },
+        {
+          "id": 6528
+        },
+        {
+          "id": 6529
+        },
+        {
+          "id": 6530
+        },
+        {
+          "id": 6531
+        },
+        {
+          "id": 6540
+        }
+      ]
     },
     {
       "id": 102201,
@@ -634,7 +1947,108 @@
         1022012
       ],
       "steam_dlc_id": 3681910,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6700
+        },
+        {
+          "id": 6701
+        },
+        {
+          "id": 6702
+        },
+        {
+          "id": 6703
+        },
+        {
+          "id": 6704
+        },
+        {
+          "id": 6705
+        },
+        {
+          "id": 6706
+        },
+        {
+          "id": 6707
+        },
+        {
+          "id": 6708
+        },
+        {
+          "id": 6709
+        },
+        {
+          "id": 6710
+        },
+        {
+          "id": 6711
+        },
+        {
+          "id": 6712
+        },
+        {
+          "id": 6713
+        },
+        {
+          "id": 6714
+        },
+        {
+          "id": 6715
+        },
+        {
+          "id": 6716
+        },
+        {
+          "id": 6717
+        },
+        {
+          "id": 6718
+        },
+        {
+          "id": 6719
+        },
+        {
+          "id": 6720
+        },
+        {
+          "id": 6721
+        },
+        {
+          "id": 6722
+        },
+        {
+          "id": 6723
+        },
+        {
+          "id": 6724
+        },
+        {
+          "id": 6725
+        },
+        {
+          "id": 6726
+        },
+        {
+          "id": 6727
+        },
+        {
+          "id": 6728
+        },
+        {
+          "id": 6729
+        },
+        {
+          "id": 6730
+        },
+        {
+          "id": 6731
+        },
+        {
+          "id": 6740
+        }
+      ]
     },
     {
       "id": 103801,
@@ -687,7 +2101,111 @@
         1038012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6800
+        },
+        {
+          "id": 6801
+        },
+        {
+          "id": 6802
+        },
+        {
+          "id": 6803
+        },
+        {
+          "id": 6804
+        },
+        {
+          "id": 6805
+        },
+        {
+          "id": 6806
+        },
+        {
+          "id": 6807
+        },
+        {
+          "id": 6808
+        },
+        {
+          "id": 6809
+        },
+        {
+          "id": 6810
+        },
+        {
+          "id": 6811
+        },
+        {
+          "id": 6812
+        },
+        {
+          "id": 6813
+        },
+        {
+          "id": 6814
+        },
+        {
+          "id": 6815
+        },
+        {
+          "id": 6816
+        },
+        {
+          "id": 6817
+        },
+        {
+          "id": 6818
+        },
+        {
+          "id": 6819
+        },
+        {
+          "id": 6820
+        },
+        {
+          "id": 6821
+        },
+        {
+          "id": 6822
+        },
+        {
+          "id": 6823
+        },
+        {
+          "id": 6824
+        },
+        {
+          "id": 6825
+        },
+        {
+          "id": 6826
+        },
+        {
+          "id": 6827
+        },
+        {
+          "id": 6828
+        },
+        {
+          "id": 6829
+        },
+        {
+          "id": 6830
+        },
+        {
+          "id": 6831
+        },
+        {
+          "id": 6832
+        },
+        {
+          "id": 6840
+        }
+      ]
     },
     {
       "id": 103101,
@@ -732,7 +2250,108 @@
         1031012
       ],
       "steam_dlc_id": 4212180,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 6900
+        },
+        {
+          "id": 6901
+        },
+        {
+          "id": 6902
+        },
+        {
+          "id": 6903
+        },
+        {
+          "id": 6904
+        },
+        {
+          "id": 6905
+        },
+        {
+          "id": 6906
+        },
+        {
+          "id": 6907
+        },
+        {
+          "id": 6908
+        },
+        {
+          "id": 6909
+        },
+        {
+          "id": 6910
+        },
+        {
+          "id": 6911
+        },
+        {
+          "id": 6912
+        },
+        {
+          "id": 6913
+        },
+        {
+          "id": 6914
+        },
+        {
+          "id": 6915
+        },
+        {
+          "id": 6916
+        },
+        {
+          "id": 6917
+        },
+        {
+          "id": 6918
+        },
+        {
+          "id": 6919
+        },
+        {
+          "id": 6920
+        },
+        {
+          "id": 6921
+        },
+        {
+          "id": 6922
+        },
+        {
+          "id": 6923
+        },
+        {
+          "id": 6924
+        },
+        {
+          "id": 6925
+        },
+        {
+          "id": 6926
+        },
+        {
+          "id": 6927
+        },
+        {
+          "id": 6928
+        },
+        {
+          "id": 6929
+        },
+        {
+          "id": 6930
+        },
+        {
+          "id": 6931
+        },
+        {
+          "id": 6940
+        }
+      ]
     },
     {
       "id": 101801,
@@ -777,7 +2396,108 @@
         1018012
       ],
       "steam_dlc_id": 0,
-      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init"
+      "source": "BaseActorConf + BaseActorAttrConf + BaseActorTalentQualityConf + BaseActorPotentialConf.init",
+      "full_potentials": [
+        {
+          "id": 5200
+        },
+        {
+          "id": 5201
+        },
+        {
+          "id": 5202
+        },
+        {
+          "id": 5203
+        },
+        {
+          "id": 5204
+        },
+        {
+          "id": 5205
+        },
+        {
+          "id": 5206
+        },
+        {
+          "id": 5207
+        },
+        {
+          "id": 5208
+        },
+        {
+          "id": 5209
+        },
+        {
+          "id": 5210
+        },
+        {
+          "id": 5211
+        },
+        {
+          "id": 5212
+        },
+        {
+          "id": 5213
+        },
+        {
+          "id": 5214
+        },
+        {
+          "id": 5215
+        },
+        {
+          "id": 5216
+        },
+        {
+          "id": 5217
+        },
+        {
+          "id": 5218
+        },
+        {
+          "id": 5219
+        },
+        {
+          "id": 5220
+        },
+        {
+          "id": 5221
+        },
+        {
+          "id": 5222
+        },
+        {
+          "id": 5223
+        },
+        {
+          "id": 5224
+        },
+        {
+          "id": 5225
+        },
+        {
+          "id": 5226
+        },
+        {
+          "id": 5227
+        },
+        {
+          "id": 5228
+        },
+        {
+          "id": 5229
+        },
+        {
+          "id": 5230
+        },
+        {
+          "id": 5231
+        },
+        {
+          "id": 5240
+        }
+      ]
     }
   ],
   "strategies": [

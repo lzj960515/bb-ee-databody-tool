@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import struct
 
+from .body_types import BodyContent, BodyStrategy
 from .save_codec import Field, Message, SaveDocument, SaveFormatError
 
 MODEL_NAME = "ModelPlayerNewFesActorPack"
@@ -56,7 +57,11 @@ def capacity(pack: Message, rules: dict) -> int:
     return pages * rules["page_size"]
 
 
-def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: list[int], score: int) -> Message:
+def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: list[int], score: int,
+                *, content: BodyContent | None = None) -> Message:
+    if content is None:
+        content = BodyContent(tuple(BodyStrategy(i, q) for i, q in zip(strategy_ids, qualities)),
+                              frozenset(strategy_ids), tuple(p['id'] for p in character.get('potentials', [])))
     fields = [Field.varint(1, uid), Field.varint(2, character["id"])]
     for attr in character["base_attrs"]:
         payload = Message([Field.varint(1, attr["type"]), double_field(3, attr["value"])])
@@ -65,9 +70,12 @@ def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: l
     for strategy_id, quality in zip(strategy_ids, qualities):
         blessing = Message([Field.varint(1, strategy_id), Field.varint(2, quality), Field.varint(3, 1)])
         blessings.append(blessing.to_bytes())
-    fields.extend(Field.bytes(8, payload) for payload in blessings)
-    for potential in character.get("potentials", []):
-        fields.append(Field.bytes(15, Message([Field.varint(1, potential["id"])]).to_bytes()))
+    for strategy in content.owned_strategies:
+        blessing = Message([Field.varint(1, strategy.id), Field.varint(2, strategy.quality),
+                            Field.varint(3, int(strategy.id in content.active_strategy_ids))])
+        fields.append(Field.bytes(8, blessing.to_bytes()))
+    for potential_id in content.potential_ids:
+        fields.append(Field.bytes(15, Message([Field.varint(1, potential_id)]).to_bytes()))
     # 评分决定数据体颜色；基础属性仍按角色初始配置，不随颜色提高。
     fields.append(double_field(16, score))
     for talent in character["talents"]:
@@ -82,7 +90,7 @@ def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: l
 
 
 def append_body(document: SaveDocument, character: dict, strategy_ids: list[int], qualities: list[int], rules: dict,
-                *, score: int | None = None) -> int:
+                *, score: int | None = None, content: BodyContent | None = None) -> int:
     model, pack = pack_from_save(document)
     entries = body_entries(pack)
     if len(entries) >= capacity(pack, rules):
@@ -91,7 +99,7 @@ def append_body(document: SaveDocument, character: dict, strategy_ids: list[int]
     if uid >= 1 << 32:
         raise ValueError("数据体编号已达到游戏格式上限")
     score = rules["inherit_score"] if score is None else score
-    body = create_body(uid, character, strategy_ids, qualities, score)
+    body = create_body(uid, character, strategy_ids, qualities, score, content=content)
     entry = Message([Field.varint(1, uid), Field.bytes(2, body.to_bytes())])
     pack = pack.replace(1, [*pack.fields(1), Field.bytes(1, entry.to_bytes())])
     pack = pack.replace(2, [Field.varint(2, uid)])

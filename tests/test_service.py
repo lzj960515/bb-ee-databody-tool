@@ -8,7 +8,7 @@ import lz4.frame
 
 from databody.save_codec import Field, Message, SaveDocument
 from databody.bodies import MODEL_NAME, body_entries, double_field, double_value, nested, pack_from_save
-from databody.body_types import BodyRequest
+from databody.body_types import BodyRequest, BodyStrategy
 from databody.service import DataBodyService
 
 
@@ -61,6 +61,38 @@ class ServiceTests(unittest.TestCase):
     def batch_requests(self):
         return [BodyRequest(101101, (2113, 2120), (4, 3)),
                 BodyRequest(102101, (2226, 2227), (3, 4), body_quality=4)]
+
+    def test_full_body_keeps_owned_and_outgoing_strategies_separate_and_restores(self):
+        self.service.characters[101101]['full_potentials'] = [{'id': 6001}, {'id': 6002}]
+        self.service.strategies[2113].update(gradation=1, labels=[1], pre_labels=[])
+        self.service.strategies[2120].update(gradation=2, labels=[2], pre_labels=[1])
+        self.service.strategies[2226].update(gradation=4, labels=[3], pre_labels=[99])
+        request = BodyRequest(101101, (2113, 2120), (4, 3), owned_strategies=(
+            BodyStrategy(2226, 2), BodyStrategy(2120, 3), BodyStrategy(2113, 4)), full_potentials=True)
+        result = self.service.add_bodies(self.path, [request])
+        _, pack = pack_from_save(SaveDocument.from_compressed(self.path.read_bytes()))
+        body = dict(body_entries(pack))[result['uids'][0]]
+        owned = [(nested(f).get_varint(1), nested(f).get_varint(2), nested(f).get_varint(3))
+                 for f in body.fields(8)]
+        self.assertEqual(owned, [(2226, 2, 0), (2120, 3, 1), (2113, 4, 1)])
+        self.assertEqual([nested(f).get_varint(1) for f in body.fields(30)], [2113, 2120])
+        self.assertEqual([nested(f).get_varint(1) for f in body.fields(15)], [6001, 6002])
+        self.assertEqual(double_value(body, 16), 600)
+        self.service.restore_backup(self.path, result['backup_path'])
+        self.assertEqual(self.path.read_bytes(), self.original)
+
+    def test_invalid_owned_strategies_reject_before_backup_or_write(self):
+        selections = [(), (BodyStrategy(2113, 4),),
+                      (BodyStrategy(2113, 4), BodyStrategy(2120, 3), BodyStrategy(9999, 4)),
+                      (BodyStrategy(2113, 4), BodyStrategy(2120, 3), BodyStrategy(2113, 4)),
+                      (BodyStrategy(2113, 2), BodyStrategy(2120, 3)),
+                      (BodyStrategy(2113, 4), BodyStrategy(2120, 3), BodyStrategy(2226, 5))]
+        for owned in selections:
+            with self.subTest(owned=owned), self.assertRaises(ValueError):
+                self.service.add_bodies(self.path, [BodyRequest(101101, (2113, 2120), (4, 3),
+                                                               owned_strategies=owned)])
+        self.assertEqual(self.path.read_bytes(), self.original)
+        self.assertFalse((self.root / 'DataBodyToolBackups').exists())
 
     def test_batch_adds_two_bodies_with_one_original_backup_and_can_restore(self):
         result = self.service.add_bodies(self.path, self.batch_requests())
@@ -143,6 +175,13 @@ class ServiceTests(unittest.TestCase):
                 body = body.replace(2, [Field.varint(2, 101101)])
             elif mismatch == "score":
                 body = body.replace(16, [double_field(16, 600)])
+            elif mismatch == "owned":
+                blessings = list(body.fields(8))
+                first = nested(blessings[0]).replace(2, [Field.varint(2, 1)])
+                blessings[0] = Field.bytes(8, first.to_bytes())
+                body = body.replace(8, blessings)
+            elif mismatch == "potential":
+                body = body.replace(15, [Field.bytes(15, msg(Field.varint(1, 99999)))])
             else:
                 blessings = list(body.fields(30))
                 first = nested(blessings[0])
@@ -156,7 +195,7 @@ class ServiceTests(unittest.TestCase):
             corrupted.replace_model(MODEL_NAME, model.replace(1, [Field.bytes(1, pack.to_bytes())]).to_bytes())
             return encode(corrupted)
 
-        for mismatch in ("character", "strategy", "quality", "score"):
+        for mismatch in ("character", "strategy", "quality", "score", "owned", "potential"):
             with self.subTest(mismatch=mismatch), patch.object(SaveDocument, "to_compressed", encode_with_mismatch):
                 with self.assertRaisesRegex(ValueError, "回读验证"):
                     self.service.add_bodies(self.path, self.batch_requests())

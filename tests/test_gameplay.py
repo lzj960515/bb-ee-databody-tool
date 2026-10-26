@@ -15,6 +15,17 @@ class GameplayGuideTests(unittest.TestCase):
     def setUpClass(cls):
         read = lambda name: json.loads((ROOT / 'data' / name).read_text(encoding='utf-8'))
         cls.service = GameplayGuideService(read('catalog.json'), read('planner_rules.json'), read('builds.json'))
+        # 规则回归使用最小目标，独立于产品模板是否要求填满五位。
+        cls.rules_service = GameplayGuideService(read('catalog.json'), read('planner_rules.json'), {'builds': [
+            {'id': 'storm-fire', 'title': '风暴火环', 'summary': '', 'targets': [2470, 2462],
+             'starters': [3264, 2474, 2470, 2462], 'upgrades': [3246, 3249, 2452, 2454]},
+            {'id': 'bleed-storm', 'title': '撕裂斩杀', 'summary': '', 'targets': [3277],
+             'starters': [3227, 3236, 3277]},
+            {'id': 'ice-pulse', 'title': '寒气脉冲', 'summary': '', 'targets': [2226, 2227, 2253],
+             'starters': [2226, 2227, 2248, 2253]},
+            {'id': 'lance-ice', 'title': '光枪冰锥', 'summary': '', 'targets': [2256, 2255],
+             'starters': [3549, 2258, 2256, 2255], 'upgrades': [2213, 2218, 2238]},
+        ]})
 
     def test_empty_selection_shows_complete_guide_without_filling_inheritance(self):
         guide = self.service.describe('lightning-lance')
@@ -36,7 +47,7 @@ class GameplayGuideTests(unittest.TestCase):
         self.assertFalse(self.service.describe_custom({'target_ids': [2253]}, [2253])['selection']['errors'])
 
     def test_dual_effect_stays_with_its_trigger_source_not_output_faction(self):
-        guide = self.service.describe('storm-fire')
+        guide = self.rules_service.describe('storm-fire')
         lanes = {lane['trigger']: lane['strategies'] for lane in guide['lanes']}
         self.assertIn(3264, lanes[2])  # 技能风暴
         self.assertIn(2470, lanes[2])  # 风暴火环，输出火环但触发源是风暴
@@ -44,7 +55,7 @@ class GameplayGuideTests(unittest.TestCase):
         self.assertIn(2462, lanes[4])  # 火环燃烧，触发源是火环
         self.assertIn(3249, guide['optional_ids'])
         self.assertIn(2454, lanes[4])  # 未继承风暴火环时，III级火环仍是取得前置。
-        inherited = self.service.describe('storm-fire', [2470, 2462])
+        inherited = self.rules_service.describe('storm-fire', [2470, 2462])
         self.assertIn(2454, inherited['optional_ids'])
 
     def test_picker_positions_follow_activation_source_and_include_alternative_slots(self):
@@ -58,8 +69,8 @@ class GameplayGuideTests(unittest.TestCase):
         self.assertTrue(all(positions.values()))
 
     def test_manual_selection_updates_map_and_route_from_the_same_requirements(self):
-        empty = self.service.describe('storm-fire')
-        selected = self.service.describe('storm-fire', [2470, 2462])
+        empty = self.rules_service.describe('storm-fire')
+        selected = self.rules_service.describe('storm-fire', [2470, 2462])
         self.assertEqual(selected['selection']['inherited_ids'], [2470, 2462])
         self.assertEqual(selected['selection']['active_ids'], [])
         self.assertNotEqual(selected['lanes'], empty['lanes'])
@@ -81,7 +92,7 @@ class GameplayGuideTests(unittest.TestCase):
 
     def test_all_builds_have_serializable_guides_and_each_strategy_has_one_place(self):
         builds = self.service.list_builds()
-        self.assertEqual(len(builds), 10)
+        self.assertEqual(len(builds), 23)
         self.assertFalse(any(item['id'].startswith('strategy-') for item in builds))
         for item in builds:
             with self.subTest(build=item['id']):
@@ -128,16 +139,38 @@ class GameplayGuideTests(unittest.TestCase):
         self.assertNotIn(3265, inherited_execute['strategy_ids'])
 
     def test_inherited_ice_pulse_removes_draw_only_ice_and_lightning_requirements(self):
-        regular = self.service.describe('ice-pulse')
-        inherited = self.service.describe('ice-pulse', [2253])
+        regular = self.rules_service.describe('ice-pulse')
+        inherited = self.rules_service.describe('ice-pulse', [2253])
         self.assertTrue({2168, 2248}.issubset(regular['strategy_ids']))
         self.assertEqual(set(inherited['strategy_ids']), {2226, 2227, 2253})
         self.assertEqual(inherited['lanes'][3]['strategies'], [])
-        self.assertEqual(self.service.describe('ice-pulse')['strategy_ids'], regular['strategy_ids'])
+        self.assertEqual(self.rules_service.describe('ice-pulse')['strategy_ids'], regular['strategy_ids'])
+
+    def test_owned_dual_targets_share_the_custom_build_route_and_fill_prerequisites(self):
+        for row in self.service.planner.strategies.values():
+            if not row['is_combined']:
+                continue
+            with self.subTest(strategy=row['name']):
+                owned = self.service.describe_owned([row['id']])
+                expected = self.service.describe_custom({'target_ids': [row['id']]})
+                self.assertEqual(owned, expected)
+                self.assertGreater(len(owned['strategy_ids']), 1)
+                self.assertEqual(owned['selection']['errors'], [])
+                self.assert_route_legal(owned)
+
+    def test_owned_targets_keep_explicit_bases_and_report_conflicts_like_custom_builds(self):
+        owned = self.service.describe_owned([2253, 2226])
+        self.assertEqual(owned['selection']['errors'], [])
+        self.assertIn(2226, owned['lanes'][1]['strategies'])
+        self.assertTrue({2227, 2248}.issubset(owned['strategy_ids']))
+        self.assert_route_legal(owned)
+        conflict = self.service.describe_owned([3227, 2226])
+        self.assertTrue(conflict['selection']['errors'])
+        self.assertEqual(set(conflict['strategy_ids']), {3227, 2226})
 
     def test_full_catalog_selection_can_change_trigger_and_use_the_freed_slot(self):
         inherited = [3226, 3236, 3277, 2170]
-        guide = self.service.describe('bleed-storm', inherited)
+        guide = self.rules_service.describe('bleed-storm', inherited)
         self.assertEqual(guide['selection']['errors'], [])
         self.assertEqual(guide['selection']['inherited_ids'], inherited)
         self.assertNotIn(3227, guide['strategy_ids'])
@@ -145,7 +178,7 @@ class GameplayGuideTests(unittest.TestCase):
         self.assertIn(2170, guide['lanes'][3]['strategies'])
 
     def test_optional_upgrades_do_not_reoccupy_released_positions(self):
-        guide = self.service.describe('lance-ice', [2256, 3517, 3549])
+        guide = self.rules_service.describe('lance-ice', [2256, 3517, 3549])
         self.assertEqual(guide['selection']['errors'], [])
         self.assertFalse({2213, 2218, 2238}.intersection(guide['strategy_ids']))
         self.assertTrue({2213, 2218, 2238}.issubset(guide['optional_ids']))
@@ -172,7 +205,9 @@ class GameplayGuideTests(unittest.TestCase):
         inherited = [3534, 3546, 3539, 3505]
         guide = self.service.describe_custom(draft, inherited)
         self.assertEqual(guide['selection']['errors'], [])
-        self.assertEqual(guide['steps'][-1]['strategy_id'], 3526)
+        acquired_ids = [step['strategy_id'] for step in guide['steps']]
+        self.assertLess(acquired_ids.index(3557), acquired_ids.index(3526))
+        self.assertLess(acquired_ids.index(3545), acquired_ids.index(3526))
         self.assert_route_legal(guide)
 
     def test_custom_target_click_order_does_not_force_acquisition_order(self):

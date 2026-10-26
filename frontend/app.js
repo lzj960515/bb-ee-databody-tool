@@ -6,6 +6,7 @@
     CustomBuildDraft,
     GuideRequestQueue,
     StrategyPickerModel,
+    SingleBodyEditor,
   } = globalThis.DataBodyModel;
   const elements = [
     "全部",
@@ -44,7 +45,7 @@
     customId: null,
     customQuery: "",
     nextDraftId: 1,
-    single: new BodyEditor(1),
+    single: new SingleBodyEditor(),
     element: "全部",
     query: "",
     saves: [],
@@ -269,6 +270,11 @@
     }
   }
   function currentGuideRequest() {
+    if (state.mode === "single")
+      return {
+        method: "describe_owned_strategies",
+        args: [state.single.owned.map((row) => row.id)],
+      };
     return state.mode === "custom"
       ? { method: "describe_custom_build", args: [customDraft().document()] }
       : {
@@ -280,15 +286,16 @@
     const { method, args } = currentGuideRequest();
     return call(method, ...args);
   }
-  function renderDetailPreservingPosition() {
-    const scrollTop = document.querySelector(".detail-scroll")?.scrollTop || 0;
+  function renderWorkspacePreservingPosition() {
+    const scrollSelector = state.mode === "single" ? ".single-page" : ".detail-scroll";
+    const scrollTop = document.querySelector(scrollSelector)?.scrollTop || 0;
     const title =
       document.activeElement?.id === "custom-title"
         ? document.activeElement
         : null;
     const selection = title && [title.selectionStart, title.selectionEnd];
     render();
-    document.querySelector(".detail-scroll").scrollTop = scrollTop;
+    document.querySelector(scrollSelector).scrollTop = scrollTop;
     if (selection) {
       const input = document.querySelector("#custom-title");
       input.focus({ preventScroll: true });
@@ -299,7 +306,7 @@
     state.guide = null;
     state.guideError = null;
     // 草稿先显示，路线后计算；旧路线不代表刚刚修改的搭配。
-    renderDetailPreservingPosition();
+    renderWorkspacePreservingPosition();
     try {
       const guide = await guideRequests.request(currentGuideRequest());
       if (!guide) return;
@@ -307,7 +314,7 @@
     } catch (error) {
       state.guideError = error.message;
     }
-    renderDetailPreservingPosition();
+    renderWorkspacePreservingPosition();
   }
   function combinedBadge(row) {
     return row?.is_combined ? '<span class="tier combined">双重</span>' : "";
@@ -327,7 +334,25 @@
           : state.guide.selection.errors.length
             ? "目标策略"
             : "局内取得";
-    return `<article class="strategy-card ${selected ? "selected" : ""}" data-strategy="${id}" style="--element-color:${elementColor(row.category)}"><div class="strategy-title"><h3>${escape(row.name)}</h3>${row.is_combined ? combinedBadge(row) : `<span class="tier">${tiers[row.gradation] || "策略"}</span>`}</div><div class="strategy-source ${selected ? "inherited" : assumed ? "pending" : ""}">${source}${required ? " · 需继承" : ""}</div><div class="strategy-card-actions"><button data-action="inspect" data-id="${id}" aria-label="查看${escape(row.name)}效果">效果</button><span class="suggested">${suggested ? "推荐" : ""}</span><button data-action="${selected ? "unpick" : "pick"}" data-id="${id}">${selected ? "移出继承" : "继承"}</button></div></article>`;
+    return strategyCardHtml(id, {
+      selected, source: source + (required ? " · 需继承" : ""),
+      sourceClass: selected ? "inherited" : assumed ? "pending" : "",
+      inspectAction: "inspect", suggested,
+    });
+  }
+  function ownedStrategyCard(id) {
+    const owned = state.single.owned.find((row) => row.id === id);
+    const selected = Boolean(state.single.locate(id));
+    const automatic = !owned;
+    return strategyCardHtml(id, {
+      selected,
+      source: `${qualityNames[state.single.ownedQuality(id)]}策略${automatic ? " · 自动补齐" : ""}`,
+      inspectAction: "inspect-owned", removeAction: automatic ? null : "remove-owned",
+    });
+  }
+  function strategyCardHtml(id, { selected, source, sourceClass, inspectAction, removeAction, suggested }) {
+    const row = strategy(id);
+    return `<article class="strategy-card ${selected ? "selected" : ""}" data-strategy="${id}" style="--element-color:${elementColor(row.category)}"><div class="strategy-title"><h3>${escape(row.name)}</h3>${row.is_combined ? combinedBadge(row) : `<span class="tier">${tiers[row.gradation] || "策略"}</span>`}${removeAction ? `<button class="strategy-remove" data-action="${removeAction}" data-id="${id}" aria-label="移除${escape(row.name)}">×</button>` : ""}</div><div class="strategy-source ${sourceClass}">${escape(source)}</div><div class="strategy-card-actions"><button data-action="${inspectAction}" data-id="${id}" aria-label="查看${escape(row.name)}效果">效果</button><span class="suggested">${suggested ? "推荐" : ""}</span><button data-action="${selected ? "unpick" : "pick"}" data-id="${id}">${selected ? "移出继承" : "继承"}</button></div></article>`;
   }
   function detailHeadingHtml() {
     if (state.mode !== "custom") {
@@ -340,22 +365,29 @@
   }
   function targetEditorHtml() {
     if (state.mode !== "custom") return "";
-    const targets = customDraft().targetIds;
-    return `<section class="target-editor"><div class="section-heading"><h2>目标策略</h2><button class="secondary" data-action="add-target">＋ 添加策略</button></div><div class="target-list">${targets.length ? targets.map((id) => `<div class="target-chip"><button class="target-name" data-action="inspect" data-id="${id}">${escape(name(id))}${combinedBadge(strategy(id))}</button><button class="target-remove" data-action="remove-target" data-id="${id}" aria-label="移除目标${escape(name(id))}">×</button></div>`).join("") : '<p class="muted small">选择想要的策略，再从下方决定四项继承。</p>'}</div></section>`;
+    const ids = customDraft().targetIds;
+    const cards = ids
+      .map((id) => `<div class="target-chip"><button class="target-name" data-action="inspect" data-id="${id}">${escape(name(id))}${combinedBadge(strategy(id))}</button><button class="target-remove" data-action="remove-target" data-id="${id}" aria-label="移除${escape(name(id))}">×</button></div>`)
+      .join("");
+    return `<section class="target-editor"><div class="section-heading"><h2>目标策略<span class="collection-count">${ids.length} 项</span></h2><button class="secondary" data-action="add-target">＋ 添加策略</button></div><div class="target-list">${cards || '<p class="muted small">选择想要的策略，再从下方决定四项继承。</p>'}</div></section>`;
   }
   function buildMapHtml() {
     const guide = state.guide,
       suggested = new Set(guide.suggested_ids);
+    const cards = strategyLanesHtml(guide, (id) => strategyCard(id, suggested.has(id)));
+    return `<div class="section-heading"><h2>${guide.selection.errors.length ? "当前搭配" : "最终搭配"}</h2><span class="muted">按当前继承选择计算</span></div>${cards}`;
+  }
+  function strategyLanesHtml(guide, renderCard, otherHeading = "") {
     const lanes = guide.lanes
       .map(
         (lane) =>
-          `<section class="lane"><div class="lane-header"><span>${escape(lane.label)}</span><span class="lane-index">${lane.strategies.length ? `${lane.strategies.length} 项` : ""}</span></div><div class="lane-cards">${lane.strategies.length ? lane.strategies.map((id) => strategyCard(id, suggested.has(id))).join("") : '<div class="lane-empty">空闲</div>'}</div></section>`,
+          `<section class="lane" data-trigger="${lane.trigger}"><div class="lane-header"><span>${escape(lane.label)}</span><span class="lane-index">${lane.strategies.length ? `${lane.strategies.length} 项` : ""}</span></div><div class="lane-cards">${lane.strategies.length ? lane.strategies.map(renderCard).join("") : '<div class="lane-empty">空闲</div>'}</div></section>`,
       )
       .join("");
     const others = guide.other_strategy_ids.length
-      ? `<div class="extra-strategies">${guide.other_strategy_ids.map((id) => strategyCard(id, suggested.has(id))).join("")}</div>`
+      ? `${otherHeading ? `<h3 class="unassigned-heading">${escape(otherHeading)}</h3>` : ""}<div class="extra-strategies">${guide.other_strategy_ids.map(renderCard).join("")}</div>`
       : "";
-    return `<div class="section-heading"><h2>${guide.selection.errors.length ? "当前搭配" : "最终搭配"}</h2><span class="muted">按当前继承选择计算</span></div><div class="lanes">${lanes}</div>${others}`;
+    return `<div class="lanes">${lanes}</div>${others}`;
   }
   function optionalHtml() {
     const optional = state.guide.optional_ids || [];
@@ -396,7 +428,7 @@
         : "选入继承后，路线会省去可以跳过的步骤。";
     return `<h2>局内怎么拿</h2><p class="route-intro">${guide.steps.length ? introduction : selected.length ? "目标策略已齐，可以在局内提升品质。" : "此玩法没有额外的获取步骤。"}</p>${lines ? `<div class="route-list">${lines}</div>` : ""}`;
   }
-  function bodyEditorHtml(index) {
+  function bodyEditorHtml(index, includeSlots = true) {
     const body = editor().bodies[index];
     const characters = state.catalog.characters
       .map(
@@ -404,7 +436,7 @@
           `<option value="${character.id}" ${body.character_id === character.id ? "selected" : ""}>${escape(character.name)}</option>`,
       )
       .join("");
-    return `<section class="body-editor"><div class="body-heading"><h3>数据体${index === 0 ? "一" : "二"}</h3><select data-field="character" data-body="${index}" aria-label="数据体${index + 1}角色"><option value="">选择角色</option>${characters}</select><select class="color-select ${body.body_quality === 4 ? "gold" : ""}" data-field="color" data-body="${index}" aria-label="数据体${index + 1}颜色"><option value="3" ${body.body_quality === 3 ? "selected" : ""}>紫色 · 600分</option><option value="4" ${body.body_quality === 4 ? "selected" : ""}>金色 · 700分</option></select></div><div class="body-slots">${body.slots.map((slot, slotIndex) => slotHtml(index, slotIndex, slot)).join("")}</div></section>`;
+    return `<section class="body-editor"><div class="body-heading"><h3>数据体${index === 0 ? "一" : "二"}</h3><select data-field="character" data-body="${index}" aria-label="数据体${index + 1}角色"><option value="">选择角色</option>${characters}</select><select class="color-select ${body.body_quality === 4 ? "gold" : ""}" data-field="color" data-body="${index}" aria-label="数据体${index + 1}颜色"><option value="3" ${body.body_quality === 3 ? "selected" : ""}>紫色 · 600分</option><option value="4" ${body.body_quality === 4 ? "selected" : ""}>金色 · 700分</option></select></div>${includeSlots ? `<div class="body-slots">${body.slots.map((slot, slotIndex) => slotHtml(index, slotIndex, slot)).join("")}</div>` : ""}</section>`;
   }
   function slotHtml(bodyIndex, slotIndex, slot) {
     const description =
@@ -449,14 +481,26 @@
     );
   }
   async function selectionChanged() {
-    if (state.mode === "single") {
-      renderSingle();
-      return;
-    }
     await refreshGuide();
   }
+  function ownedStrategiesHtml() {
+    const cards = state.guide
+      ? strategyLanesHtml(state.guide, ownedStrategyCard)
+      : `<p class="guide-computation ${state.guideError ? "error" : "muted"}" role="status">${escape(state.guideError || "正在更新策略…")}</p>`;
+    const errors = state.guide?.selection.errors || [];
+    const count = state.guide?.strategy_ids.length ?? state.single.owned.length;
+    return `<section class="owned-editor"><div class="section-heading"><h2>自身策略<span class="collection-count">${count} 项</span></h2><button class="secondary" data-action="add-owned">＋ 添加策略</button></div>${cards}${errors.length ? `<p class="feedback error">${escape(errors.join("；"))}</p>` : ""}</section>`;
+  }
   function renderSingle() {
-    workspace.innerHTML = `<section class="single-page"><div class="single-layout"><h1>单个数据体</h1><div class="single-form">${bodyEditorHtml(0)}<div class="dock-footer"><span class="feedback"></span><button class="primary" data-action="save" ${state.busy ? "disabled" : ""}>添加数据体</button></div></div></div></section>`;
+    const body = state.single.bodies[0];
+    const character = state.catalog.characters.find(
+      (row) => row.id === body.character_id,
+    );
+    const potentialCount = character?.full_potentials.length;
+    const potentialStatus = state.single.fullPotentials
+      ? character ? `${potentialCount} 项潜能` : "选择角色后生效"
+      : "保留初始潜能";
+    workspace.innerHTML = `<section class="single-page"><div class="single-layout"><div class="single-title"><h1>单个数据体</h1></div><div class="single-form">${bodyEditorHtml(0, false)}${ownedStrategiesHtml()}<section class="single-inheritance"><div class="section-heading"><h2>继承策略</h2><span class="muted small">传给其他角色 · 2 项</span></div><div class="body-slots">${body.slots.map((slot, i) => slotHtml(0, i, slot)).join("")}</div></section><div class="dock-footer"><label class="potential-option"><input type="checkbox" role="switch" id="full-potentials" ${state.single.fullPotentials ? "checked" : ""}><span>全潜能</span><span class="potential-status">${potentialStatus}</span></label><button class="primary" data-action="save" ${state.busy || !state.guide || state.guide.selection.errors.length ? "disabled" : ""}>添加数据体</button></div></div></div></section>`;
   }
   function showModal(title, body, actions = "") {
     modal.className = "";
@@ -471,10 +515,12 @@
   }
   function openPicker(body, slot, purpose = "inheritance") {
     const existing =
-      purpose === "target" ? null : editor().bodies[body].slots[slot];
+      purpose === "target" || purpose === "owned"
+        ? null
+        : editor().bodies[body].slots[slot];
     const recommended =
       state.mode === "single"
-        ? []
+        ? state.guide?.strategy_ids || state.single.owned.map((row) => row.id)
         : state.guide?.suggested_ids ||
           state.guide?.strategy_ids ||
           customDraft()?.targetIds ||
@@ -492,11 +538,13 @@
     });
     state.picker = picker;
     showModal(
-      purpose === "target"
-        ? "添加目标策略"
-        : `选择策略${slot === 0 ? "一" : "二"}`,
+      purpose === "owned"
+        ? "添加自身策略"
+        : purpose === "target"
+          ? "添加目标策略"
+          : `选择策略${slot === 0 ? "一" : "二"}`,
       `<div class="picker-controls"><input id="strategy-search" placeholder="搜索策略名称或效果" aria-label="搜索策略"><select id="picker-element" aria-label="策略元素">${elements.map((element) => `<option>${element}</option>`).join("")}</select><span class="muted small" id="picker-count"></span></div><div class="picker-layout"><div class="picker-list" id="picker-list"></div><section class="picker-detail" id="picker-detail"></section></div>`,
-      `<button class="secondary" data-action="close-modal">取消</button><button class="primary" id="picker-save" data-action="picker-save">${purpose === "target" ? "加入搭配" : "保存选择"}</button>`,
+      `<button class="secondary" data-action="close-modal">取消</button><button class="primary" id="picker-save" data-action="picker-save">${purpose === "target" ? "加入搭配" : purpose === "owned" ? "添加策略" : "保存选择"}</button>`,
     );
     renderPickerList();
     renderPickerDetail();
@@ -523,6 +571,20 @@
     modal.className = "strategy-modal";
     renderPickerDetail();
   }
+  function inspectOwned(id) {
+    state.picker = {
+      purpose: "owned",
+      selected: id,
+      quality: state.single.ownedQuality(id),
+    };
+    showModal(
+      "自身策略",
+      '<section class="picker-detail strategy-inspector" id="picker-detail"></section>',
+      '<button class="secondary" data-action="close-modal">关闭</button><button class="primary" id="picker-save" data-action="picker-save">保存品质</button>',
+    );
+    modal.className = "strategy-modal";
+    renderPickerDetail();
+  }
   function renderPickerList() {
     const picker = state.picker,
       visible = picker.visible();
@@ -532,7 +594,7 @@
       visible
         .map(
           (row) =>
-            `<button class="picker-row ${row.id === picker.selected ? "active" : ""}" data-action="picker-row" data-id="${row.id}"><span class="picker-row-main"><span class="picker-name">${escape(row.name)}${combinedBadge(row)}</span><span class="picker-category">${escape(row.category)} · ${escape(state.strategyPositions[row.id].join("或"))}位</span></span><span class="picker-row-mark">${picker.recommended.has(row.id) ? '<span class="recommended-badge">推荐</span>' : ""}${picker.purpose === "target" ? (customDraft().targetIds.includes(row.id) ? '<span class="picked-badge">已加入</span>' : "") : editor().locate(row.id) ? '<span class="picked-badge">已继承</span>' : ""}</span></button>`,
+            `<button class="picker-row ${row.id === picker.selected ? "active" : ""}" data-action="picker-row" data-id="${row.id}"><span class="picker-row-main"><span class="picker-name">${escape(row.name)}${combinedBadge(row)}</span><span class="picker-category">${escape(row.category)} · ${escape(state.strategyPositions[row.id].join("或"))}位</span></span><span class="picker-row-mark">${picker.recommended.has(row.id) ? '<span class="recommended-badge">推荐</span>' : ""}${picker.purpose === "target" ? (customDraft().targetIds.includes(row.id) ? '<span class="picked-badge">已加入</span>' : "") : picker.purpose === "owned" ? (state.single.owned.some((item) => item.id === row.id) ? '<span class="picked-badge">已拥有</span>' : "") : editor().locate(row.id) ? '<span class="picked-badge">已继承</span>' : ""}</span></button>`,
         )
         .join("") || '<div class="empty-result">没有找到这个策略。</div>';
   }
@@ -553,7 +615,9 @@
       row.quality_details.find((item) => item.quality === picker.quality) ||
       row.quality_details.at(-1);
     picker.quality = detail.quality;
-    const prerequisites = row.true_pre
+    const prerequisiteLabels =
+      picker.purpose === "owned" ? row.pre_labels : row.true_pre;
+    const prerequisites = prerequisiteLabels
       .map((label) =>
         state.catalog.strategies
           .filter((candidate) => candidate.labels.includes(label))
@@ -657,26 +721,21 @@
   }
   async function prepareSave() {
     if (state.busy) return;
-    const requests = editor().requests();
+    const requests = editor().requests(state.guide);
     if (!state.save) throw new Error("请先在右上角选择存档。");
-    if (state.mode !== "single") {
-      setBusy(true);
-      try {
-        const guide = await describeCurrentBuild();
-        const errors = [
-          ...guide.selection.conflicts,
-          ...guide.selection.errors,
-        ];
-        if (errors.length) throw new Error([...new Set(errors)].join("；"));
-      } finally {
-        setBusy(false);
-      }
+    setBusy(true);
+    try {
+      const guide = await describeCurrentBuild();
+      const errors = [...guide.selection.conflicts, ...guide.selection.errors];
+      if (errors.length) throw new Error([...new Set(errors)].join("；"));
+    } finally {
+      setBusy(false);
     }
     state.confirm = { requests, path: state.save.path };
     const rows = requests
       .map(
         (request, index) =>
-          `<div class="confirm-body"><h3>${requests.length === 1 ? "数据体" : `数据体${index === 0 ? "一" : "二"}`}：${escape(state.catalog.characters.find((row) => row.id === request.character_id).name)}</h3><p class="muted">${request.body_quality === 4 ? "金色 700分" : "紫色 600分"}</p>${request.strategy_ids.map((id, i) => `<p>${escape(name(id))}（${qualityNames[request.qualities[i]]}）</p>`).join("")}</div>`,
+          `<div class="confirm-body"><h3>${requests.length === 1 ? "数据体" : `数据体${index === 0 ? "一" : "二"}`}：${escape(state.catalog.characters.find((row) => row.id === request.character_id).name)}</h3><p class="muted">${request.body_quality === 4 ? "金色 700分" : "紫色 600分"}${request.full_potentials ? " · 全潜能" : ""}</p>${request.owned_strategies ? `<h4>自身策略 · ${request.owned_strategies.length} 项</h4><p>${request.owned_strategies.map((row) => `${escape(name(row.id))}（${qualityNames[row.quality]}）`).join("、")}</p><h4>继承策略</h4>` : ""}${request.strategy_ids.map((id, i) => `<p>${escape(name(id))}（${qualityNames[request.qualities[i]]}）</p>`).join("")}</div>`,
       )
       .join("");
     showModal(
@@ -734,7 +793,7 @@
       state.guideError = null;
       guideRequests.invalidate();
       render();
-      if (state.mode !== "single" && activeBuildKey()) await refreshGuide();
+      if (state.mode === "single" || activeBuildKey()) await refreshGuide();
     } else if (action === "element") {
       state.element = button.dataset.value;
       renderLibrary();
@@ -747,7 +806,13 @@
     else if (action === "delete-custom") await deleteCustom();
     else if (action === "add-target")
       openPicker(undefined, undefined, "target");
-    else if (action === "remove-target") {
+    else if (action === "add-owned") openPicker(undefined, undefined, "owned");
+    else if (action === "inspect-owned")
+      inspectOwned(Number(button.dataset.id));
+    else if (action === "remove-owned") {
+      state.single.removeOwned(Number(button.dataset.id));
+      await selectionChanged();
+    } else if (action === "remove-target") {
       customDraft().removeTarget(Number(button.dataset.id));
       await refreshGuide();
     } else if (action === "back") {
@@ -758,7 +823,10 @@
       render();
     } else if (action === "pick") {
       const row = strategy(button.dataset.id);
-      editor().add(row.id, Math.max(...row.qualities));
+      const owned =
+        state.mode === "single" &&
+        state.single.owned.find((item) => item.id === row.id);
+      editor().add(row.id, owned ? owned.quality : Math.max(...row.qualities));
       await selectionChanged();
     } else if (action === "unpick") {
       const location = editor().locate(Number(button.dataset.id));
@@ -774,11 +842,19 @@
       if (!state.busy) closeModal();
     } else if (action === "picker-row") {
       state.picker.selected = Number(button.dataset.id);
+      if (state.mode === "single") {
+        const owned = state.single.owned.find(
+          (row) => row.id === state.picker.selected,
+        );
+        if (owned) state.picker.quality = owned.quality;
+      }
       renderPickerList();
       renderPickerDetail();
     } else if (action === "picker-save") {
       const picker = state.picker;
       if (picker.purpose === "target") customDraft().addTarget(picker.selected);
+      else if (picker.purpose === "owned")
+        state.single.setOwned(picker.selected, picker.quality);
       else if (picker.body === undefined)
         editor().add(picker.selected, picker.quality);
       else
@@ -817,6 +893,7 @@
     if (field === "character") {
       editor().bodies[Number(event.target.dataset.body)].character_id =
         Number(event.target.value) || null;
+      if (state.mode === "single") renderSingle();
       updateDraftStatus();
     } else if (field === "color") {
       editor().bodies[Number(event.target.dataset.body)].body_quality = Number(
@@ -824,6 +901,9 @@
       );
       event.target.classList.toggle("gold", Number(event.target.value) === 4);
       updateDraftStatus();
+    } else if (event.target.id === "full-potentials") {
+      state.single.fullPotentials = event.target.checked;
+      renderWorkspacePreservingPosition();
     } else if (event.target.id === "picker-quality") {
       state.picker.quality = Number(event.target.value);
       renderPickerDetail();
