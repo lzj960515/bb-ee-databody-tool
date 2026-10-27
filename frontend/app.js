@@ -638,18 +638,28 @@
       row.quality_details.find((item) => item.quality === picker.quality) ||
       row.quality_details.at(-1);
     picker.quality = detail.quality;
-    const prerequisiteLabels =
-      picker.purpose === "owned" ? row.pre_labels : row.true_pre;
-    const prerequisites = prerequisiteLabels
+    document.querySelector("#picker-detail").innerHTML =
+      `<div class="picker-detail-heading"><h3>${escape(row.name)}</h3>${combinedBadge(row)}</div>${tags([row.category])}${picker.recommended?.has(row.id) ? '<span class="recommended-badge">推荐</span>' : ""}<p>${escape(detail.description)}</p>${picker.purpose !== "target" ? `<div class="quality-row"><label for="picker-quality">策略品质</label><select id="picker-quality">${row.qualities.map((quality) => `<option value="${quality}" ${quality === picker.quality ? "selected" : ""}>${qualityNames[quality]}</option>`).join("")}</select></div>` : ""}${prerequisitesHtml(row)}`;
+  }
+  function prerequisiteNames(labels) {
+    return labels
       .map((label) =>
         state.catalog.strategies
           .filter((candidate) => candidate.labels.includes(label))
           .map((candidate) => candidate.name)
           .join(" / "),
       )
-      .filter(Boolean);
-    document.querySelector("#picker-detail").innerHTML =
-      `<div class="picker-detail-heading"><h3>${escape(row.name)}</h3>${combinedBadge(row)}</div>${tags([row.category])}${picker.recommended?.has(row.id) ? '<span class="recommended-badge">推荐</span>' : ""}<p>${escape(detail.description)}</p>${picker.purpose !== "target" ? `<div class="quality-row"><label for="picker-quality">策略品质</label><select id="picker-quality">${row.qualities.map((quality) => `<option value="${quality}" ${quality === picker.quality ? "selected" : ""}>${qualityNames[quality]}</option>`).join("")}</select></div>` : ""}${prerequisites.length ? `<div class="strategy-prerequisites">生效需要：${escape(prerequisites.join(" ＋ "))}</div>` : ""}`;
+      .filter(Boolean).join(" ＋ ");
+  }
+  function prerequisitesHtml(row) {
+    const normal = prerequisiteNames(row.pre_labels);
+    const inherited = prerequisiteNames(row.true_pre);
+    if (!normal && !inherited) return "";
+    // 同一策略在各入口展示相同规则，避免把普通获取与继承激活都叫“生效需要”。
+    const lines = normal === inherited
+      ? [["生效前置", normal]]
+      : [["普通获取前置", normal || "无"], ["继承激活前置", inherited || "无"]];
+    return `<div class="strategy-prerequisites">${lines.map(([label, text]) => `<div>${label}：${escape(text)}</div>`).join("")}</div>`;
   }
   async function chooseSave(path) {
     if (state.busy) return;
