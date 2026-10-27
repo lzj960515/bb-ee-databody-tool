@@ -5,7 +5,7 @@ import json
 import threading
 from pathlib import Path
 
-from .body_types import BodyRequest, BodyStrategy
+from .body_types import BodyInheritance, BodyRequest, BodyStrategy
 from .custom_builds import CustomBuildStore
 from .planner import BuildPlanner
 from .service import DataBodyService, application_directory
@@ -165,7 +165,16 @@ class DesktopAPI:
             raise ValueError('潜能配置格式不正确')
         owned = self._owned_strategies(request.get('owned_strategies'))
         return BodyRequest(character_id, tuple(strategy_ids), tuple(qualities), body_quality,
-                           owned, full_potentials)
+                           owned, full_potentials, request.get('max_hp'), request.get('max_mp'),
+                           self._inheritances(request.get('inheritances', [])))
+
+    def _inheritances(self, values) -> tuple[BodyInheritance, ...]:
+        if not isinstance(values, list) or any(
+            not isinstance(row, dict) or type(row.get('character_id')) is not int
+            or type(row.get('skill_id')) is not int for row in values
+        ):
+            raise ValueError('继承角色与传承技配置格式不正确')
+        return tuple(BodyInheritance(row['character_id'], row['skill_id']) for row in values)
 
     def _owned_strategies(self, values) -> tuple[BodyStrategy, ...] | None:
         if values is None:

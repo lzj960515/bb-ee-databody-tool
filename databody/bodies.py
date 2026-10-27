@@ -4,6 +4,7 @@ from __future__ import annotations
 import struct
 
 from .body_types import BodyContent, BodyStrategy
+from .body_configuration import initial_attributes, initial_talents
 from .save_codec import Field, Message, SaveDocument, SaveFormatError
 
 MODEL_NAME = "ModelPlayerNewFesActorPack"
@@ -63,8 +64,9 @@ def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: l
         content = BodyContent(tuple(BodyStrategy(i, q) for i, q in zip(strategy_ids, qualities)),
                               frozenset(strategy_ids), tuple(p['id'] for p in character.get('potentials', [])))
     fields = [Field.varint(1, uid), Field.varint(2, character["id"])]
-    for attr in character["base_attrs"]:
-        payload = Message([Field.varint(1, attr["type"]), double_field(3, attr["value"])])
+    attributes = initial_attributes(character) if content.attributes is None else content.attributes
+    for attr in attributes:
+        payload = Message([Field.varint(1, attr.type), double_field(3, attr.value)])
         fields.append(Field.bytes(6, payload.to_bytes()))
     blessings = []
     for strategy_id, quality in zip(strategy_ids, qualities):
@@ -76,13 +78,20 @@ def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: l
         fields.append(Field.bytes(8, blessing.to_bytes()))
     for potential_id in content.potential_ids:
         fields.append(Field.bytes(15, Message([Field.varint(1, potential_id)]).to_bytes()))
-    # 评分决定数据体颜色；基础属性仍按角色初始配置，不随颜色提高。
+    # 评分只决定数据体颜色，属性独立配置。
     fields.append(double_field(16, score))
-    for talent in character["talents"]:
-        talent_fields = [Field.varint(1, talent["id"]), Field.varint(2, talent["quality"])]
-        if talent.get("inheritNum"):
-            talent_fields.append(Field.varint(3, talent["inheritNum"]))
+    talents = initial_talents(character) if content.talents is None else content.talents
+    for talent in talents:
+        talent_fields = [Field.varint(1, talent.id), Field.varint(2, talent.quality)]
+        if talent.inherit_num:
+            talent_fields.append(Field.varint(3, talent.inherit_num))
+        if talent.from_actor_id:
+            talent_fields.append(Field.varint(4, talent.from_actor_id))
         fields.append(Field.bytes(17, Message(talent_fields).to_bytes()))
+    for skill in content.skills:
+        payload = Message([Field.varint(1, skill.id), Field.varint(2, skill.level),
+                           Field.varint(3, skill.from_actor_id)])
+        fields.append(Field.bytes(26, payload.to_bytes()))
     fields.extend(Field.bytes(30, payload) for payload in blessings)
     # 沿用游戏 GenerateByTemplate 的生成标记；继承技能索引/等级零值由游戏解释为第一项、一级。
     fields.append(Field.varint(35, 1))

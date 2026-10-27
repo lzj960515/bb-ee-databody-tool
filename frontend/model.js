@@ -103,10 +103,45 @@
     }
   }
   class SingleBodyEditor extends BodyEditor {
-    constructor() {
+    constructor(characters = []) {
       super(1);
+      this.characters = characters;
       this.owned = [];
       this.fullPotentials = false;
+      this.attributes = { max_hp: "", max_mp: "" };
+      this.inheritances = [null, null];
+    }
+    selectCharacter(id) {
+      this.bodies[0].character_id = id;
+      this.inheritances = this.inheritances.map((row) => row?.character_id === id ? null : row);
+    }
+    selectInheritance(index, characterId) {
+      if (characterId === null) {
+        this.inheritances[index] = null;
+        return;
+      }
+      if (characterId === this.bodies[0].character_id)
+        throw new Error("继承角色不能与数据体角色相同。");
+      if (this.inheritances.some((row, i) => i !== index && row?.character_id === characterId))
+        throw new Error("两位继承角色不能重复。");
+      const character = this.characters.find((row) => row.id === characterId);
+      this.inheritances[index] = {character_id: characterId, skill_id: character.inherit_skills[0]};
+    }
+    attributeValue(field) {
+      const value = this.attributes[field];
+      if (value !== "") return Number(value);
+      const character = this.characters.find((row) => row.id === this.bodies[0].character_id);
+      return character?.base_attrs.find((row) => row.type === (field === "max_hp" ? 1 : 18))?.value ?? null;
+    }
+    configuredAttributes() {
+      const attributes = {};
+      for (const [field, label] of [["max_hp", "生命上限"], ["max_mp", "MP上限"]]) {
+        const value = this.attributeValue(field);
+        if (value !== null && (!Number.isInteger(value) || value < 1 || value > 2147483647))
+          throw new Error(`${label}请输入1～2147483647之间的整数。`);
+        attributes[field] = value;
+      }
+      return attributes;
     }
     setOwned(id, quality) {
       const existing = this.owned.find((row) => row.id === id);
@@ -142,6 +177,8 @@
         ...request,
         owned_strategies: copy(owned),
         full_potentials: this.fullPotentials,
+        ...this.configuredAttributes(),
+        inheritances: copy(this.inheritances.filter(Boolean)),
       }));
     }
   }

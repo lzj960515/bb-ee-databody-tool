@@ -13,6 +13,8 @@ from pathlib import Path
 
 from .bodies import append_body, body_entries, capacity, double_value, nested, pack_from_save
 from .body_types import BodyContent, BodyRequest, BodyStrategy
+from .body_configuration import (configured_attributes, initial_talents, inherited_skills,
+                                 inherited_talents, resolve_inheritances)
 from .save_codec import SaveDocument
 from .strategy_activation import activate_strategies
 
@@ -152,7 +154,11 @@ class DataBodyService:
         if request.full_potentials and not character.get(potential_field):
             raise ValueError('当前目录缺少该角色的全潜能配置')
         potential_ids = tuple(p['id'] for p in character.get(potential_field, []))
-        return BodyContent(owned, active_ids, potential_ids)
+        teachers = resolve_inheritances(request.character_id, request.inheritances, self.characters)
+        attributes = configured_attributes(character, request.max_hp, request.max_mp, teachers)
+        talents = initial_talents(character) + inherited_talents(teachers)
+        skills = inherited_skills(request.inheritances)
+        return BodyContent(owned, active_ids, potential_ids, attributes, talents, skills)
 
     def _validate_batch_limits(self, document: SaveDocument, count: int) -> None:
         _, pack = pack_from_save(document)
@@ -186,6 +192,13 @@ class DataBodyService:
             potentials = tuple(nested(f).get_varint(1) for f in created.fields(15))
             if owned != expected_owned or potentials != content.potential_ids:
                 raise ValueError('生成数据体的潜能或自身策略回读验证失败，原存档未修改')
+            attributes = [(nested(f).get_varint(1), double_value(nested(f), 3)) for f in created.fields(6)]
+            talents = [tuple(nested(f).get_varint(i) for i in (1, 2, 3, 4)) for f in created.fields(17)]
+            skills = [tuple(nested(f).get_varint(i) for i in (1, 2, 3)) for f in created.fields(26)]
+            if (attributes != [(a.type, a.value) for a in content.attributes]
+                    or talents != [(t.id, t.quality, t.inherit_num, t.from_actor_id) for t in content.talents]
+                    or skills != [(s.id, s.level, s.from_actor_id) for s in content.skills]):
+                raise ValueError('生成数据体的属性或传承角色回读验证失败，原存档未修改')
         return len(bodies)
 
     def _backup(self, path: Path, original: bytes) -> Path:

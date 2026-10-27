@@ -45,7 +45,7 @@
     customId: null,
     customQuery: "",
     nextDraftId: 1,
-    single: new SingleBodyEditor(),
+    single: null,
     element: "全部",
     query: "",
     saves: [],
@@ -491,6 +491,29 @@
     const count = state.guide?.strategy_ids.length ?? state.single.owned.length;
     return `<section class="owned-editor"><div class="section-heading"><h2>自身策略<span class="collection-count">${count} 项</span></h2><button class="secondary" data-action="add-owned">＋ 添加策略</button></div>${cards}${errors.length ? `<p class="feedback error">${escape(errors.join("；"))}</p>` : ""}</section>`;
   }
+  function attributesHtml() {
+    const inputs = [["max_hp", "血量上限（HP）"], ["max_mp", "MP 上限"]].map(([field, label]) => {
+      const value = state.single.attributes[field] || state.single.attributeValue(field) || "";
+      return `<label class="configuration-field">${label}<input type="number" data-field="${field}" aria-label="${label}" min="1" max="2147483647" step="1" placeholder="选择角色后显示" value="${escape(value)}"></label>`;
+    }).join("");
+    return `<section class="body-configuration"><div class="section-heading"><h2>基础属性</h2></div><div class="attribute-fields">${inputs}</div></section>`;
+  }
+  function inheritedCharacterHtml(index) {
+    const selected = state.single.inheritances[index];
+    const character = state.catalog.characters.find((row) => row.id === selected?.character_id);
+    const skill = character?.inherit_skill_details.find((row) => row.id === selected.skill_id);
+    const excluded = [state.single.bodies[0].character_id, state.single.inheritances[1 - index]?.character_id];
+    const characters = state.catalog.characters.map((row) =>
+      `<option value="${row.id}" ${excluded.includes(row.id) ? "disabled" : ""} ${selected?.character_id === row.id ? "selected" : ""}>${escape(row.name)}</option>`,
+    ).join("");
+    const skills = character?.inherit_skill_details.map((row) =>
+      `<option value="${row.id}" ${selected.skill_id === row.id ? "selected" : ""}>${escape(row.name)}</option>`,
+    ).join("") || '<option value="">先选择角色</option>';
+    return `<div class="inherited-character"><div class="inheritance-fields"><label class="configuration-field">角色${index === 0 ? "一" : "二"}<select data-field="inherit-character" data-index="${index}" aria-label="继承角色${index + 1}"><option value="">不继承</option>${characters}</select></label><label class="configuration-field">传承技<select data-field="inherit-skill" data-index="${index}" aria-label="传承技${index + 1}" ${character ? "" : "disabled"}>${skills}</select></label></div>${skill ? `<p class="inherit-skill-description">${escape(skill.description)}</p><p class="inherit-talent"><span>天赋 · ${escape(character.inherit_talent_detail.name)}</span>${escape(character.inherit_talent_detail.description)}</p>` : ""}</div>`;
+  }
+  function inheritancesHtml() {
+    return `<section class="body-configuration"><div class="section-heading"><h2>继承角色</h2></div><div class="inherited-characters">${[0, 1].map(inheritedCharacterHtml).join("")}</div></section>`;
+  }
   function renderSingle() {
     const body = state.single.bodies[0];
     const character = state.catalog.characters.find(
@@ -500,7 +523,7 @@
     const potentialStatus = state.single.fullPotentials
       ? character ? `${potentialCount} 项潜能` : "选择角色后生效"
       : "保留初始潜能";
-    workspace.innerHTML = `<section class="single-page"><div class="single-layout"><div class="single-title"><h1>单个数据体</h1></div><div class="single-form">${bodyEditorHtml(0, false)}${ownedStrategiesHtml()}<section class="single-inheritance"><div class="section-heading"><h2>继承策略</h2><span class="muted small">传给其他角色 · 2 项</span></div><div class="body-slots">${body.slots.map((slot, i) => slotHtml(0, i, slot)).join("")}</div></section><div class="dock-footer"><label class="potential-option"><input type="checkbox" role="switch" id="full-potentials" ${state.single.fullPotentials ? "checked" : ""}><span>全潜能</span><span class="potential-status">${potentialStatus}</span></label><button class="primary" data-action="save" ${state.busy || !state.guide || state.guide.selection.errors.length ? "disabled" : ""}>添加数据体</button></div></div></div></section>`;
+    workspace.innerHTML = `<section class="single-page"><div class="single-layout"><div class="single-title"><h1>单个数据体</h1></div><div class="single-form">${bodyEditorHtml(0, false)}${ownedStrategiesHtml()}<section class="single-inheritance"><div class="section-heading"><h2>继承策略</h2><span class="muted small">传给其他角色 · 2 项</span></div><div class="body-slots">${body.slots.map((slot, i) => slotHtml(0, i, slot)).join("")}</div></section>${attributesHtml()}${inheritancesHtml()}<div class="dock-footer"><label class="potential-option"><input type="checkbox" role="switch" id="full-potentials" ${state.single.fullPotentials ? "checked" : ""}><span>全潜能</span><span class="potential-status">${potentialStatus}</span></label><button class="primary" data-action="save" ${state.busy || !state.guide || state.guide.selection.errors.length ? "disabled" : ""}>添加数据体</button></div></div></div></section>`;
   }
   function showModal(title, body, actions = "") {
     modal.className = "";
@@ -719,6 +742,15 @@
         )
         .join("") || '<tr><td colspan="3">没有找到数据体。</td></tr>';
   }
+  function configurationSummary(request) {
+    if (!request.owned_strategies) return "";
+    const inherited = request.inheritances.map((row) => {
+      const character = state.catalog.characters.find((item) => item.id === row.character_id);
+      const skill = character.inherit_skill_details.find((item) => item.id === row.skill_id);
+      return `<p>${escape(character.name)} · ${escape(skill.name)}</p>`;
+    }).join("");
+    return `<h4>基础属性</h4><p>HP ${request.max_hp} · MP ${request.max_mp}</p>${inherited ? `<h4>继承角色</h4>${inherited}` : ""}`;
+  }
   async function prepareSave() {
     if (state.busy) return;
     const requests = editor().requests(state.guide);
@@ -735,7 +767,7 @@
     const rows = requests
       .map(
         (request, index) =>
-          `<div class="confirm-body"><h3>${requests.length === 1 ? "数据体" : `数据体${index === 0 ? "一" : "二"}`}：${escape(state.catalog.characters.find((row) => row.id === request.character_id).name)}</h3><p class="muted">${request.body_quality === 4 ? "金色 700分" : "紫色 600分"}${request.full_potentials ? " · 全潜能" : ""}</p>${request.owned_strategies ? `<h4>自身策略 · ${request.owned_strategies.length} 项</h4><p>${request.owned_strategies.map((row) => `${escape(name(row.id))}（${qualityNames[row.quality]}）`).join("、")}</p><h4>继承策略</h4>` : ""}${request.strategy_ids.map((id, i) => `<p>${escape(name(id))}（${qualityNames[request.qualities[i]]}）</p>`).join("")}</div>`,
+          `<div class="confirm-body"><h3>${requests.length === 1 ? "数据体" : `数据体${index === 0 ? "一" : "二"}`}：${escape(state.catalog.characters.find((row) => row.id === request.character_id).name)}</h3><p class="muted">${request.body_quality === 4 ? "金色 700分" : "紫色 600分"}${request.full_potentials ? " · 全潜能" : ""}</p>${request.owned_strategies ? `<h4>自身策略 · ${request.owned_strategies.length} 项</h4><p>${request.owned_strategies.map((row) => `${escape(name(row.id))}（${qualityNames[row.quality]}）`).join("、")}</p><h4>继承策略</h4>` : ""}${request.strategy_ids.map((id, i) => `<p>${escape(name(id))}（${qualityNames[request.qualities[i]]}）</p>`).join("")}${configurationSummary(request)}</div>`,
       )
       .join("");
     showModal(
@@ -873,7 +905,9 @@
       handleAction(button).catch((error) => toast(error.message, true));
   });
   document.addEventListener("input", (event) => {
-    if (event.target.id === "build-search") {
+    if (["max_hp", "max_mp"].includes(event.target.dataset.field)) {
+      state.single.attributes[event.target.dataset.field] = event.target.validity.badInput ? "NaN" : event.target.value;
+    } else if (event.target.id === "build-search") {
       state.query = event.target.value;
       renderBuildList();
     } else if (event.target.id === "custom-search") {
@@ -891,10 +925,20 @@
   document.addEventListener("change", (event) => {
     const field = event.target.dataset.field;
     if (field === "character") {
-      editor().bodies[Number(event.target.dataset.body)].character_id =
-        Number(event.target.value) || null;
-      if (state.mode === "single") renderSingle();
+      const characterId = Number(event.target.value) || null;
+      if (state.mode === "single") {
+        const sameAsTeacher = state.single.inheritances.some((row) => row?.character_id === characterId);
+        state.single.selectCharacter(characterId);
+        renderSingle();
+        if (sameAsTeacher) toast("已移除与数据体相同的继承角色。");
+      } else editor().bodies[Number(event.target.dataset.body)].character_id = characterId;
       updateDraftStatus();
+    } else if (field === "inherit-character") {
+      state.single.selectInheritance(Number(event.target.dataset.index), Number(event.target.value) || null);
+      renderWorkspacePreservingPosition();
+    } else if (field === "inherit-skill") {
+      state.single.inheritances[Number(event.target.dataset.index)].skill_id = Number(event.target.value);
+      renderWorkspacePreservingPosition();
     } else if (field === "color") {
       editor().bodies[Number(event.target.dataset.body)].body_quality = Number(
         event.target.value,
@@ -936,6 +980,7 @@
     try {
       const initial = await call("get_initial_data");
       state.catalog = initial.catalog;
+      state.single = new SingleBodyEditor(state.catalog.characters);
       state.strategyPositions = initial.strategy_positions;
       state.strategies = new Map(
         state.catalog.strategies.map((row) => [row.id, row]),

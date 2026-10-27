@@ -9,6 +9,53 @@ const {
 } = require("../frontend/model.js");
 
 const guide = (ids) => ({ strategy_ids: ids, selection: { errors: [] } });
+const characters = [
+  {id: 1, base_attrs: [{type: 1, value: 1300}, {type: 18, value: 100}], inherit_skills: [12, 11]},
+  {id: 2, base_attrs: [{type: 1, value: 1000}, {type: 18, value: 100}], inherit_skills: [22, 23]},
+  {id: 3, base_attrs: [{type: 1, value: 800}, {type: 18, value: 120}], inherit_skills: [31, 32]},
+];
+
+test("单体属性默认跟随角色，改值保留；继承技能随来源切换且不能串角色", () => {
+  const single = new SingleBodyEditor(characters);
+  single.selectCharacter(1);
+  assert.equal(single.attributeValue('max_hp'), 1300);
+  assert.equal(single.attributeValue('max_mp'), 100);
+  single.attributes.max_hp = '5000';
+  single.selectInheritance(0, 2);
+  assert.deepEqual(single.inheritances[0], {character_id: 2, skill_id: 22});
+  single.inheritances[0].skill_id = 23;
+  single.selectInheritance(1, 3);
+  assert.throws(() => single.selectInheritance(1, 2), /重复/);
+  assert.throws(() => single.selectInheritance(1, 1), /相同/);
+  single.selectCharacter(2);
+  assert.equal(single.inheritances[0], null);
+  assert.equal(single.inheritances[1].character_id, 3);
+  assert.equal(single.attributeValue('max_hp'), 5000);
+  single.attributes.max_hp = '';
+  assert.equal(single.attributeValue('max_hp'), 1000);
+  single.add(2226, 4); single.add(2227, 4);
+  assert.deepEqual(single.requests(guide([2226, 2227]))[0].inheritances,
+    [{character_id: 3, skill_id: 31}]);
+  single.selectInheritance(1, null);
+  assert.deepEqual(single.requests(guide([2226, 2227]))[0].inheritances, []);
+});
+
+test("单体提交冻结自选属性和传承技能，非法数值在确认前拦截", () => {
+  const single = new SingleBodyEditor(characters);
+  single.selectCharacter(1);
+  single.add(2226, 4); single.add(2227, 4);
+  single.selectInheritance(0, 2);
+  single.inheritances[0].skill_id = 23;
+  single.attributes.max_hp = '5000'; single.attributes.max_mp = '500';
+  const request = single.requests(guide([2226, 2227]))[0];
+  assert.equal(request.max_hp, 5000); assert.equal(request.max_mp, 500);
+  single.inheritances[0].skill_id = 22;
+  assert.equal(request.inheritances[0].skill_id, 23);
+  for (const value of ['0', '-1', '1.5', 'NaN', 'Infinity', '2147483648']) {
+    single.attributes.max_hp = value;
+    assert.throws(() => single.requests(guide([2226, 2227])), /生命上限/);
+  }
+});
 
 test("单体写入包含自动前置，品质与继承同步，自动项不永久污染目标", () => {
   const single = new SingleBodyEditor();

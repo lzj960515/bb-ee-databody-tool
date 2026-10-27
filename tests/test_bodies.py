@@ -15,7 +15,7 @@ import lz4.frame
 from databody.bodies import append_body, body_entries, create_body, pack_from_save
 from databody.save_codec import Field, Message, SaveDocument
 from databody.service import DataBodyService
-from databody.body_types import BodyStrategy
+from databody.body_types import BodyInheritance, BodyRequest, BodyStrategy
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -298,6 +298,47 @@ class GameSchemaOracleTests(unittest.TestCase):
                 self.assertEqual(actor["inheritanceReplay"]["bodyQuality"], color["quality"])
                 self.assertEqual(actor["inheritanceReplay"]["strategies"],
                                  [{"id": 2226, "quality": 4}, {"id": 2227, "quality": 3}])
+
+    def test_configured_attributes_and_all_teacher_skills_decode_by_game_schema(self):
+        original_characters = json.loads((ROOT / 'research/resources/configs/BaseActorConf.json').read_text('utf-8'))
+        original_attrs = json.loads((ROOT / 'research/resources/configs/BaseActorAttrConf.json').read_text('utf-8'))
+        characters = {c['actorId']: c for c in original_characters}
+        attrs = {c['actorId']: c['attr'] for c in original_attrs}
+        records, expected = [], []
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'Save/4'
+            path.parent.mkdir()
+            path.write_bytes(sample_document().to_compressed())
+            service = DataBodyService()
+            service.load_save(path)
+            for index, character in enumerate(CATALOG['characters']):
+                teachers = [CATALOG['characters'][(index + offset) % 17]['id'] for offset in (1, 2)]
+                for variant in (0, 1):
+                    selections = tuple(BodyInheritance(t, characters[t]['inheritSkill'][variant]) for t in teachers)
+                    request = BodyRequest(character['id'], (2226, 2227), (4, 3), full_potentials=True,
+                                          max_hp=5000 + index, max_mp=500 + index, inheritances=selections)
+                    with patch.object(service, 'game_running', return_value=False):
+                        result = service.add_bodies(path, [request])
+                    _, pack = pack_from_save(SaveDocument.from_compressed(path.read_bytes()))
+                    records.append(self.record('STFesActor', dict(body_entries(pack))[result['uids'][0]].to_bytes()))
+                    expected.append((request, teachers))
+        for actor, (request, teachers) in zip(self.decode(records), expected):
+            with self.subTest(character=request.character_id, skills=request.inheritances):
+                values = {a['type']: a['value'] for a in actor['baseAttrs']}
+                self.assertEqual((values[1], values[18]), (request.max_hp, request.max_mp))
+                self.assertEqual(len(actor['skills']), 2)
+                self.assertEqual(len(actor['talents']), 3)
+                for slot, (selection, teacher) in enumerate(zip(request.inheritances, teachers)):
+                    skill = actor['skills'][slot]
+                    self.assertEqual((skill['id'], skill['level'], skill['fromActorId']),
+                                     (selection.skill_id, 1, teacher))
+                    talent = actor['talents'][slot + 1]
+                    self.assertEqual((talent['id'], talent['quality'], talent['fromActorId']),
+                                     (characters[teacher]['talents'][0]['id'],
+                                      characters[teacher]['talents'][0]['quality'], teacher))
+                    self.assertEqual(values[111 + slot], next(a['value'] for a in attrs[teacher] if a['type'] == 6))
+                self.assertEqual(actor['inheritSkillIndex'], 0)
+                self.assertEqual(actor['inheritSkillLevel'], 0)
 
 
 class BodyLifecycleTests(unittest.TestCase):

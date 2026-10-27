@@ -929,6 +929,65 @@ button:hover:not(:disabled) {
 .single-inheritance .section-heading {
   margin-bottom: 12px;
 }
+.body-configuration {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.body-configuration .section-heading {
+  margin-bottom: 14px;
+}
+.attribute-fields,
+.inherited-characters,
+.inheritance-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.attribute-fields {
+  max-width: 520px;
+}
+.configuration-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.configuration-field input,
+.configuration-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.inherited-character {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px;
+}
+.inherit-skill-description {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.inherit-talent {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.inherit-talent span {
+  display: block;
+  font-weight: 600;
+}
+@media (max-width: 1050px) {
+  .inherited-characters {
+    grid-template-columns: 1fr;
+  }
+}
 .confirm-body h4 {
   font-size: 14px;
   margin: 16px 0 6px;
