@@ -66,23 +66,23 @@ test("单体写入包含自动前置，品质与继承同步，自动项不永�
   single.set(0, 1, 2226, 4);
   single.setOwned(2253, 2);
   assert.equal(single.bodies[0].slots[0].quality, 2);
-  const planned = guide([2226,2227,2248,2168,2253]);
+  const planned = guide([2226,2227,2253]);
   const request = single.requests(planned)[0];
   assert.equal(request.full_potentials, false);
   assert.deepEqual(request.owned_strategies, [
-    {id:2226,quality:4}, {id:2227,quality:4}, {id:2248,quality:4},
-    {id:2168,quality:4}, {id:2253,quality:2},
+    {id:2226,quality:4}, {id:2227,quality:4}, {id:2253,quality:2},
   ]);
   assert.deepEqual(single.owned.map(row => row.id), [2253,2226]);
   assert.deepEqual(request.strategy_ids, [2253,2226]);
-  single.setOwned(2248, 3);
-  assert.equal(single.requests(planned)[0].owned_strategies.find(row => row.id===2248).quality, 3);
+  single.setOwned(2227, 3);
+  assert.equal(single.requests(planned)[0].owned_strategies.find(row => row.id===2227).quality, 3);
   single.removeOwned(2253);
   assert.equal(single.locate(2253), null);
   assert.throws(() => single.requests(planned), /两项/);
-  single.set(0, 0, 2248, 3);
-  const updated = single.requests(guide([2226,2227,2248]))[0];
-  assert.ok(!updated.owned_strategies.some(row => row.id===2168));
+  single.removeOwned(2227);
+  single.set(0, 0, 3539, 3);
+  const updated = single.requests(guide([2226,3526,3539]))[0];
+  assert.ok(!updated.owned_strategies.some(row => row.id===2227));
 });
 
 test("单体计算尚未完成、冲突或过期时不能写入未补齐的策略", () => {

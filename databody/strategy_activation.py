@@ -1,13 +1,13 @@
-"""游戏按四层扫描策略标签；继承用truePre，自身普通策略用preLabels。"""
+"""游戏按四层扫描标签；继承和特殊来源用 truePre，普通获取用 preLabels。"""
 from .planner_types import Activation
 
 
-def activate_strategies(strategies: dict[int, dict], inherited: tuple[int, ...],
-                        acquired: tuple[int, ...]) -> Activation:
+def activate_strategies(strategies: dict[int, dict], special_ids: tuple[int, ...],
+                        ordinary_ids: tuple[int, ...]) -> Activation:
     labels: set[int] = set()
     active, missing = [], []
-    rows = [(strategy_id, True) for strategy_id in inherited]
-    rows.extend((strategy_id, False) for strategy_id in acquired)
+    rows = [(strategy_id, True) for strategy_id in special_ids]
+    rows.extend((strategy_id, False) for strategy_id in ordinary_ids)
     rows.sort(key=lambda row: strategies[row[0]]['gradation'])
     for strategy_id, is_inherited in rows:
         strategy = strategies[strategy_id]

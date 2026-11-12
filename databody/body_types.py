@@ -1,6 +1,8 @@
 """数据体的角色、潜能、自身策略和传出继承策略。"""
 from dataclasses import dataclass
 
+SPECIAL_STRATEGY_SOURCE = 5  # 游戏 EBreedDungeonBlessSource.Special，按 truePre 激活。
+
 
 @dataclass(frozen=True)
 class BodyStrategy:
@@ -56,3 +58,4 @@ class BodyContent:
     attributes: tuple[BodyAttribute, ...] | None = None
     talents: tuple[BodyTalent, ...] | None = None
     skills: tuple[BodySkill, ...] = ()
+    owned_strategy_source: int = 0

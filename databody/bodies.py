@@ -75,6 +75,8 @@ def create_body(uid: int, character: dict, strategy_ids: list[int], qualities: l
     for strategy in content.owned_strategies:
         blessing = Message([Field.varint(1, strategy.id), Field.varint(2, strategy.quality),
                             Field.varint(3, int(strategy.id in content.active_strategy_ids))])
+        if content.owned_strategy_source:
+            blessing = blessing.replace(5, [Field.varint(5, content.owned_strategy_source)])
         fields.append(Field.bytes(8, blessing.to_bytes()))
     for potential_id in content.potential_ids:
         fields.append(Field.bytes(15, Message([Field.varint(1, potential_id)]).to_bytes()))

@@ -64,9 +64,9 @@ class ServiceTests(unittest.TestCase):
 
     def test_full_body_keeps_owned_and_outgoing_strategies_separate_and_restores(self):
         self.service.characters[101101]['full_potentials'] = [{'id': 6001}, {'id': 6002}]
-        self.service.strategies[2113].update(gradation=1, labels=[1], pre_labels=[])
-        self.service.strategies[2120].update(gradation=2, labels=[2], pre_labels=[1])
-        self.service.strategies[2226].update(gradation=4, labels=[3], pre_labels=[99])
+        self.service.strategies[2113].update(gradation=1, labels=[1], true_pre=[])
+        self.service.strategies[2120].update(gradation=2, labels=[2], true_pre=[1])
+        self.service.strategies[2226].update(gradation=4, labels=[3], true_pre=[99])
         request = BodyRequest(101101, (2113, 2120), (4, 3), owned_strategies=(
             BodyStrategy(2226, 2), BodyStrategy(2120, 3), BodyStrategy(2113, 4)), full_potentials=True)
         result = self.service.add_bodies(self.path, [request])

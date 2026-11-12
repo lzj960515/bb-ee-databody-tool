@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .bodies import append_body, body_entries, capacity, double_value, nested, pack_from_save
-from .body_types import BodyContent, BodyRequest, BodyStrategy
+from .body_types import BodyContent, BodyRequest, BodyStrategy, SPECIAL_STRATEGY_SOURCE
 from .body_configuration import (configured_attributes, initial_talents, inherited_skills,
                                  inherited_talents, resolve_inheritances)
 from .save_codec import SaveDocument
@@ -148,7 +148,8 @@ class DataBodyService:
                     raise ValueError('自身策略或品质不在当前游戏配置中')
             if not set(inherited).issubset(owned):
                 raise ValueError('两项继承策略必须包含在自身策略中，且品质一致')
-            active_ids = frozenset(activate_strategies(self.strategies, (), owned_ids).active_ids)
+            active_ids = frozenset(activate_strategies(self.strategies, special_ids=owned_ids,
+                                                      ordinary_ids=()).active_ids)
         character = self.characters[request.character_id]
         potential_field = 'full_potentials' if request.full_potentials else 'potentials'
         if request.full_potentials and not character.get(potential_field):
@@ -158,7 +159,8 @@ class DataBodyService:
         attributes = configured_attributes(character, request.max_hp, request.max_mp, teachers)
         talents = initial_talents(character) + inherited_talents(teachers)
         skills = inherited_skills(request.inheritances)
-        return BodyContent(owned, active_ids, potential_ids, attributes, talents, skills)
+        source = SPECIAL_STRATEGY_SOURCE if request.owned_strategies is not None else 0
+        return BodyContent(owned, active_ids, potential_ids, attributes, talents, skills, source)
 
     def _validate_batch_limits(self, document: SaveDocument, count: int) -> None:
         _, pack = pack_from_save(document)
@@ -185,9 +187,9 @@ class DataBodyService:
             expected = list(zip(request.strategy_ids, request.qualities))
             if selected != expected or double_value(created, 16) != score:
                 raise ValueError("生成数据体的回读验证失败，原存档未修改")
-            owned = [(nested(f).get_varint(1), nested(f).get_varint(2), nested(f).get_varint(3))
+            owned = [tuple(nested(f).get_varint(i) for i in (1, 2, 3, 5))
                      for f in created.fields(8)]
-            expected_owned = [(s.id, s.quality, int(s.id in content.active_strategy_ids))
+            expected_owned = [(s.id, s.quality, int(s.id in content.active_strategy_ids), content.owned_strategy_source)
                               for s in content.owned_strategies]
             potentials = tuple(nested(f).get_varint(1) for f in created.fields(15))
             if owned != expected_owned or potentials != content.potential_ids:

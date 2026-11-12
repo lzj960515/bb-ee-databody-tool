@@ -171,16 +171,19 @@ class DesktopAPITests(unittest.TestCase):
         self.assertIn("载入", result["error"])
         self.assert_unchanged()
 
-    def test_owned_preview_uses_normal_prerequisites_without_loading_or_writing_save(self):
-        # 与自定义玩法共用完整规划，目录和真实存档保持独立。
+    def test_owned_preview_uses_activation_prerequisites_without_loading_or_writing_save(self):
+        # 单体按激活条件补齐，目录和真实存档保持独立。
         resources = Path(__file__).resolve().parent.parent
         api = DesktopAPI(DataBodyService(resources / 'data/catalog.json'),
                          resource_directory=resources, user_data_directory=self.personal_directory)
         result = api.describe_owned_strategies([2253, 2226])
         self.assertTrue(result['ok'], result)
         self.assertEqual(result['data']['selection']['errors'], [])
-        self.assertTrue({2253, 2226, 2227, 2248}.issubset(result['data']['strategy_ids']))
+        self.assertEqual({2253, 2226, 2227}, set(result['data']['strategy_ids']))
         self.assertEqual(result['data']['selection']['inherited_ids'], [])
+        self.assertEqual(result['data']['selection']['conflicts'], [])
+        self.assertEqual(result['data']['selection']['missing'], [])
+        self.assertEqual(set(result['data']['selection']['active_ids']), {2253, 2226, 2227})
         self.assertFalse(api.describe_owned_strategies('all')['ok'])
         self.assertFalse(api.describe_owned_strategies([True])['ok'])
         self.assert_unchanged()

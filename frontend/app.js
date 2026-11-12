@@ -489,7 +489,7 @@
       : `<p class="guide-computation ${state.guideError ? "error" : "muted"}" role="status">${escape(state.guideError || "正在更新策略…")}</p>`;
     const errors = state.guide?.selection.errors || [];
     const count = state.guide?.strategy_ids.length ?? state.single.owned.length;
-    return `<section class="owned-editor"><div class="section-heading"><h2>自身策略<span class="collection-count">${count} 项</span></h2><button class="secondary" data-action="add-owned">＋ 添加策略</button></div>${cards}${errors.length ? `<p class="feedback error">${escape(errors.join("；"))}</p>` : ""}</section>`;
+    return `<section class="owned-editor"><div class="section-heading"><h2>自身策略<span class="collection-count">${count} 项</span></h2><button class="secondary" data-action="add-owned">＋ 添加策略</button></div><p class="muted small">按激活前置自动补齐，完整搭配一并写入数据体。</p>${cards}${errors.length ? `<p class="feedback error">${escape(errors.join("；"))}</p>` : ""}</section>`;
   }
   function attributesHtml() {
     const inputs = [["max_hp", "血量上限（HP）"], ["max_mp", "MP 上限"]].map(([field, label]) => {

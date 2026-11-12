@@ -31,8 +31,29 @@ class GameplayGuideService:
         return self._describe(build, tuple(inherited_ids))
 
     def describe_owned(self, strategy_ids: list[int]) -> dict:
-        # 单体是同一套目标规划；传给其他角色的两项策略不是本体的传入继承。
-        return self.describe_custom({'target_ids': strategy_ids})
+        """单体直接配置最终拥有的策略，只补齐其激活条件。"""
+        targets = self._strategy_ids(strategy_ids)
+        errors = []
+        complete = None
+        try:
+            complete = self.planner.complete_activation(targets)
+        except RouteSearchExpired:
+            errors.append('搭配较复杂，暂未算完激活前置。请减少目标后重试。')
+        if complete is None:
+            complete = targets
+            if not errors:
+                errors = self._base_conflict_reasons(targets) or [
+                    '无法同时补齐所选策略的激活前置，请调整基础策略或目标搭配']
+        lanes, other = self._strategy_lanes(complete)
+        activation = self.planner.evaluate_owned(complete)
+        return {
+            'strategy_ids': list(complete), 'lanes': lanes, 'other_strategy_ids': other,
+            'selection': {
+                'inherited_ids': [], 'active_ids': list(activation.active_ids),
+                'missing': self._missing_requirements(activation.missing_labels, complete),
+                'conflicts': list(activation.conflicts), 'errors': errors,
+            },
+        }
 
     def describe_custom(self, definition: dict, inherited_ids=()) -> dict:
         """自定义只提供目标与偏好，取得条件仍由游戏规则求解。"""
@@ -104,8 +125,15 @@ class GameplayGuideService:
         }
 
     def _unreachable_reasons(self, goals: tuple[int, ...], inherited: tuple[int, ...]) -> list[str]:
+        reasons = self._base_conflict_reasons((*goals, *inherited))
+        if not reasons:
+            names = '、'.join(self.planner.name(strategy_id) for strategy_id in goals)
+            reasons.append(f'当前继承下无法同时取得并激活：{names}。请调整目标策略或继承选择')
+        return reasons
+
+    def _base_conflict_reasons(self, strategy_ids: tuple[int, ...]) -> list[str]:
         # 只报告确定的基础位冲突。红策略可通过延后激活共存，不能套用继承合并互斥。
-        bases = [strategy_id for strategy_id in dict.fromkeys((*goals, *inherited))
+        bases = [strategy_id for strategy_id in dict.fromkeys(strategy_ids)
                  if self.planner.rules[strategy_id]['trigger_group']]
         reasons = []
         for left, right in combinations(bases, 2):
@@ -115,9 +143,6 @@ class GameplayGuideService:
                 reasons.append(names + f'占用同一个{TRIGGER_NAMES[a["trigger_group"]]}位置')
             elif a['faction'] == b['faction']:
                 reasons.append(names + '属于同一派系的基础策略，请保留其中一项')
-        if not reasons:
-            names = '、'.join(self.planner.name(strategy_id) for strategy_id in goals)
-            reasons.append(f'当前继承下无法同时取得并激活：{names}。请调整目标策略或继承选择')
         return reasons
 
     def _build_summary(self, build: BuildDefinition) -> dict:

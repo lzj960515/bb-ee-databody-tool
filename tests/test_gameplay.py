@@ -146,24 +146,38 @@ class GameplayGuideTests(unittest.TestCase):
         self.assertEqual(inherited['lanes'][3]['strategies'], [])
         self.assertEqual(self.rules_service.describe('ice-pulse')['strategy_ids'], regular['strategy_ids'])
 
-    def test_owned_dual_targets_share_the_custom_build_route_and_fill_prerequisites(self):
+    def test_owned_targets_fill_only_activation_prerequisites_across_entire_catalog(self):
         for row in self.service.planner.strategies.values():
-            if not row['is_combined']:
-                continue
             with self.subTest(strategy=row['name']):
                 owned = self.service.describe_owned([row['id']])
-                expected = self.service.describe_custom({'target_ids': [row['id']]})
-                self.assertEqual(owned, expected)
-                self.assertGreater(len(owned['strategy_ids']), 1)
                 self.assertEqual(owned['selection']['errors'], [])
-                self.assert_route_legal(owned)
+                ids = tuple(owned['strategy_ids'])
+                active = self.service.planner.evaluate_start(ids)
+                self.assertEqual(set(active.active_ids), set(ids))
+                self.assertIn(row['id'], ids)
+                # 每个自动项都应是最终激活所必需的，不能混入只为抽取而补的分支。
+                for automatic in set(ids) - {row['id']}:
+                    remaining = tuple(s for s in ids if s != automatic)
+                    self.assertNotIn(row['id'], self.service.planner.evaluate_start(remaining).active_ids)
+
+    def test_owned_light_attraction_leaves_teacher_slot_for_fire_ring(self):
+        owned = self.service.describe_owned([3539, 2474])
+        self.assertEqual(owned['selection']['errors'], [])
+        self.assertEqual(set(owned['strategy_ids']), {3539, 3526, 2474})
+        self.assertIn(3539, owned['lanes'][4]['strategies'])
+        self.assertEqual(owned['lanes'][3]['strategies'], [2474])
+
+    def test_owned_more_than_four_targets_can_share_activation_dependencies(self):
+        targets = [3539, 2227, 2253, 2226, 2474]
+        owned = self.service.describe_owned(targets)
+        self.assertEqual(owned['selection']['errors'], [])
+        self.assertEqual(set(owned['strategy_ids']), {*targets, 3526, 2227})
 
     def test_owned_targets_keep_explicit_bases_and_report_conflicts_like_custom_builds(self):
         owned = self.service.describe_owned([2253, 2226])
         self.assertEqual(owned['selection']['errors'], [])
         self.assertIn(2226, owned['lanes'][1]['strategies'])
-        self.assertTrue({2227, 2248}.issubset(owned['strategy_ids']))
-        self.assert_route_legal(owned)
+        self.assertEqual(set(owned['strategy_ids']), {2253, 2226, 2227})
         conflict = self.service.describe_owned([3227, 2226])
         self.assertTrue(conflict['selection']['errors'])
         self.assertEqual(set(conflict['strategy_ids']), {3227, 2226})

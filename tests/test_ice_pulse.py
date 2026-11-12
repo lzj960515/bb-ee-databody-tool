@@ -40,17 +40,28 @@ class IcePulseSaveTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), self.original)
         return created
 
-    def test_single_body_adds_normal_prerequisites_then_saves_active_ice_pulse(self):
+    def test_single_body_adds_activation_prerequisites_then_saves_active_ice_pulse(self):
         preview = self.api.describe_owned_strategies([2253, 2226])
         self.assertTrue(preview['ok'], preview)
         guide = preview['data']
         self.assertEqual(guide['selection']['errors'], [])
-        self.assertEqual(set(guide['strategy_ids']), {2226, 2227, 2248, 2168, 2253})
+        self.assertEqual(set(guide['strategy_ids']), {2226, 2227, 2253})
         request = dict(character_id=103501, strategy_ids=[2253, 2227], qualities=[4, 4],
                        owned_strategies=[dict(id=s, quality=4) for s in guide['strategy_ids']])
         body, = self.assert_saved_and_restored([request])
         self.assertEqual({nested(f).get_varint(1) for f in body.fields(8)}, set(guide['strategy_ids']))
         self.assertTrue(all(nested(f).get_varint(3) for f in body.fields(8)))
+        self.assertTrue(all(nested(f).get_varint(5) == 5 for f in body.fields(8)))
+
+    def test_light_attraction_and_teacher_fire_ring_save_with_special_source(self):
+        guide = self.api.describe_owned_strategies([3539, 2474])['data']
+        self.assertEqual(guide['selection']['errors'], [])
+        self.assertEqual(set(guide['strategy_ids']), {3539, 3526, 2474})
+        request = dict(character_id=103501, strategy_ids=[3539, 2474], qualities=[4, 4],
+                       owned_strategies=[dict(id=s, quality=4) for s in guide['strategy_ids']])
+        body, = self.assert_saved_and_restored([request])
+        self.assertEqual({nested(f).get_varint(1) for f in body.fields(8)}, {3539, 3526, 2474})
+        self.assertTrue(all(nested(f).get_varint(3) and nested(f).get_varint(5) == 5 for f in body.fields(8)))
 
     def test_frost_build_saves_four_inherited_strategies_without_electric_base(self):
         selected = [2253, 2283, 3448, 2252]

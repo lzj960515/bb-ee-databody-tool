@@ -16,6 +16,7 @@ from databody.bodies import append_body, body_entries, create_body, pack_from_sa
 from databody.save_codec import Field, Message, SaveDocument
 from databody.service import DataBodyService
 from databody.body_types import BodyInheritance, BodyRequest, BodyStrategy
+from databody.gameplay import GameplayGuideService
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -250,7 +251,7 @@ class GameSchemaOracleTests(unittest.TestCase):
             service.load_save(path)
             records = []
             for character in CATALOG['characters']:
-                # 高阶排前面，原始游戏仍按层级扫描；2253缺前置应保持未激活。
+                # 高阶排前面，原游戏仍按层级扫描；特殊来源的2253已满足激活条件。
                 owned = (BodyStrategy(2253, 4), BodyStrategy(2227, 3), BodyStrategy(2226, 4))
                 with patch.object(service, 'game_running', return_value=False):
                     result = service.add_body(path, character['id'], [2226, 2227], [4, 3],
@@ -264,7 +265,7 @@ class GameSchemaOracleTests(unittest.TestCase):
                     expected_ids = {p['id'] for p in potentials if p.get('actorId') == character['id'] and not p.get('invalid')}
                     self.assertEqual({p['id'] for p in actor['potentials']}, expected_ids)
                     self.assertEqual(len(actor['potentials']), len(expected_ids))
-                    expected_owned = [{'id': 2253, 'quality': 4, 'active': False},
+                    expected_owned = [{'id': 2253, 'quality': 4, 'active': True},
                                       {'id': 2227, 'quality': 3, 'active': True},
                                       {'id': 2226, 'quality': 4, 'active': True}]
                     self.assertEqual(actor['refreshedOwned'], expected_owned)
@@ -272,6 +273,48 @@ class GameSchemaOracleTests(unittest.TestCase):
                                      [(r['id'], r['quality'], r['active']) for r in expected_owned])
                     self.assertEqual(actor['inheritanceReplay']['strategies'],
                                      [{'id': 2226, 'quality': 4}, {'id': 2227, 'quality': 3}])
+
+    def test_entire_catalog_owned_activation_survives_original_game_refresh(self):
+        read = lambda name: json.loads((ROOT / 'data' / name).read_text(encoding='utf8'))
+        guides = GameplayGuideService(CATALOG, read('planner_rules.json'), read('builds.json'))
+        service = DataBodyService()
+        records, expectations = [], []
+        scenarios = [[s['id']] for s in CATALOG['strategies']] + [[3539, 2474], [2253, 2226]]
+        for targets in scenarios:
+            guide = guides.describe_owned(targets)
+            self.assertEqual(guide['selection']['errors'], [], targets)
+            ids = guide['strategy_ids']
+            if len(ids) == 1:
+                companion = next(s['id'] for s in CATALOG['strategies']
+                                 if s['gradation'] == 1 and s['id'] not in ids
+                                 and not guides.planner.evaluate_start((*ids, s['id'])).conflicts)
+                ids = guides.describe_owned([*targets, companion])['strategy_ids']
+            outgoing = tuple(ids[:2])
+            owned = tuple(BodyStrategy(i, 4) for i in ids)
+            request = BodyRequest(CATALOG['characters'][0]['id'], outgoing, (4, 4), owned_strategies=owned)
+            content = service._prepare_body_content(request)
+            body = create_body(1, CATALOG['characters'][0], list(outgoing), [4, 4], 600, content=content)
+            record = self.record('STFesActor', body.to_bytes())
+            record['refreshOwned'] = True
+            records.append(record)
+            expectations.append(ids)
+        for targets, ids, actor in zip(scenarios, expectations, self.decode(records, replay=True)):
+            with self.subTest(targets=targets):
+                self.assertEqual([r['id'] for r in actor['refreshedOwned']], ids)
+                self.assertTrue(all(r['active'] for r in actor['refreshedOwned']))
+                self.assertTrue(all(r['active'] and r['source'] == 5 for r in actor['blesses']))
+
+    def test_special_source_still_requires_real_activation_prerequisites(self):
+        service = DataBodyService()
+        owned = (BodyStrategy(3539, 4), BodyStrategy(2474, 4))
+        request = BodyRequest(CATALOG['characters'][0]['id'], (3539, 2474), (4, 4), owned_strategies=owned)
+        content = service._prepare_body_content(request)
+        body = create_body(1, CATALOG['characters'][0], [3539, 2474], [4, 4], 600, content=content)
+        record = self.record('STFesActor', body.to_bytes())
+        record['refreshOwned'] = True
+        actor, = self.decode([record], replay=True)
+        self.assertEqual(actor['refreshedOwned'], [{'id': 3539, 'quality': 4, 'active': False},
+                                                 {'id': 2474, 'quality': 4, 'active': True}])
 
     def test_selected_colors_match_original_color_and_inheritance_rules(self):
         records = []

@@ -230,6 +230,38 @@ class BuildPlanner:
         elif self.can_draw(strategy_id, inherited, acquired):
             yield (*acquired, strategy_id)
 
+    def complete_activation(self, required: tuple[int, ...]) -> tuple[int, ...] | None:
+        """补齐已配置策略的激活条件；独立于局内抽取顺序和传入继承槽数。"""
+        self._validate_ids(required)
+        selected = tuple(dict.fromkeys(required))
+        return next(self._activation_options(selected, selected, _RouteSearch()), None)
+
+    def evaluate_owned(self, selected: tuple[int, ...]) -> Activation:
+        """已配置策略按特殊来源激活，基础动作仍受位置和派系约束。"""
+        self._validate_ids(selected)
+        bases = tuple(s for s in selected if self.rules[s]['trigger_group'])
+        activation = activate_strategies(self.strategies, special_ids=selected, ordinary_ids=())
+        return replace(activation, conflicts=self._conflicts(bases))
+
+    def _activation_options(self, selected: tuple[int, ...], preferred: tuple[int, ...],
+                            search: _RouteSearch):
+        search.check_time()
+        activation = self.evaluate_owned(selected)
+        if activation.conflicts:
+            return
+        if not activation.missing_labels:
+            yield tuple(sorted(selected, key=lambda s: self.strategies[s]['gradation']))
+            return
+        state = frozenset(selected), frozenset()
+        if state in search.failed:
+            return
+        strategy_id, missing = activation.missing_labels[0]
+        candidates = sorted(self.label_choices(missing[0]), key=lambda s: self._candidate_key(s, preferred))
+        for candidate in candidates:
+            if candidate not in selected and self.strategies[candidate]['gradation'] < self.strategies[strategy_id]['gradation']:
+                yield from self._activation_options((*selected, candidate), preferred, search)
+        search.failed.add(state)
+
     def complete_route(self, required: tuple[int, ...], inherited: tuple[int, ...],
                        preferred: tuple[int, ...] = ()) -> tuple[int, ...] | None:
         """补齐整套目标；后续目标受阻时回溯前面的基础触发位选择。"""
