@@ -551,6 +551,7 @@
     const picker = new StrategyPickerModel(
       state.catalog.strategies,
       recommended,
+      purpose === "owned" || purpose === "target" ? currentStrategyIds() : [],
     );
     Object.assign(picker, {
       body,
@@ -572,6 +573,11 @@
     renderPickerList();
     renderPickerDetail();
     document.querySelector("#strategy-search").focus();
+  }
+  function currentStrategyIds() {
+    if (state.guide) return state.guide.strategy_ids;
+    if (state.mode === "single") return state.single.owned.map(row => row.id);
+    return [...customDraft().targetIds, ...editor().strategyIds()];
   }
   function inspectStrategy(id) {
     const existing = editor().locate(id);
@@ -989,6 +995,8 @@
     started = true;
     try {
       const initial = await call("get_initial_data");
+      document.querySelector("#app-version").textContent = initial.version;
+      document.querySelector("#app-version").title = `当前版本 ${initial.version}`;
       state.catalog = initial.catalog;
       state.single = new SingleBodyEditor(state.catalog.characters);
       state.strategyPositions = initial.strategy_positions;

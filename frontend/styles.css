@@ -145,6 +145,14 @@ button:hover:not(:disabled) {
   color: var(--muted);
   margin-left: 9px;
 }
+.app-version {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 400;
+  color: var(--muted);
+}
 .brand-mark {
   width: 29px;
   height: 26px;

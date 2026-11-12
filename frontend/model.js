@@ -182,10 +182,34 @@
       }));
     }
   }
+  function relatedStrategyIds(strategies, selectedIds) {
+    const byId = new Map(strategies.map(row => [row.id, row]));
+    const selected = new Set(selectedIds);
+    const queue = [...selected].filter(id => byId.has(id));
+    const distances = new Map(queue.map(id => [id, 0]));
+    for (let index = 0; index < queue.length; index++) {
+      const source = byId.get(queue[index]);
+      for (const candidate of strategies) {
+        if (distances.has(candidate.id) || candidate.gradation <= source.gradation)
+          continue;
+        if (candidate.true_pre.some(label => source.labels.includes(label))) {
+          distances.set(candidate.id, distances.get(source.id) + 1);
+          queue.push(candidate.id);
+        }
+      }
+    }
+    return strategies.filter(row => distances.has(row.id) && !selected.has(row.id))
+      .sort((left, right) => distances.get(left.id) - distances.get(right.id)
+        || left.gradation - right.gradation)
+      .map(row => row.id);
+  }
   class StrategyPickerModel {
-    constructor(strategies, recommendedIds = []) {
+    constructor(strategies, recommendedIds = [], selectedIds = []) {
       this.strategies = strategies;
-      this.recommended = new Set(recommendedIds);
+      const selected = new Set(selectedIds);
+      const related = relatedStrategyIds(strategies, selectedIds);
+      this.relatedOrder = new Map(related.map((id, index) => [id, index]));
+      this.recommended = new Set([...related, ...recommendedIds.filter(id => !selected.has(id))]);
       this.query = "";
       this.element = "全部";
       this.selected = null;
@@ -203,9 +227,13 @@
         )
         .sort(
           (left, right) =>
+            this.recommendationRank(left.id) - this.recommendationRank(right.id) ||
             Number(this.recommended.has(right.id)) -
             Number(this.recommended.has(left.id)),
         );
+    }
+    recommendationRank(id) {
+      return this.relatedOrder.get(id) ?? this.relatedOrder.size;
     }
   }
   class CustomBuildDraft {

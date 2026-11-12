@@ -252,6 +252,39 @@ test("推荐只影响排序，完整目录可搜索，任一所属元素均可�
   assert.equal(picker.selected, 2);
 });
 
+test("已选召唤光阵时优先推荐后续策略，已拥有项保留但不重复推荐", () => {
+  const {strategies} = require('../data/catalog.json');
+  const picker = new StrategyPickerModel(strategies, [2474,3526], [3526]);
+  const ids = picker.visible().map(row => row.id);
+  assert.deepEqual(ids.slice(0,3), [3515,3530,3538]);
+  for (const id of [3513,3539,2181,3546]) {
+    assert.ok(picker.recommended.has(id));
+    assert.ok(ids.indexOf(id) < ids.indexOf(2474));
+  }
+  assert.ok(ids.indexOf(3513) < ids.indexOf(3539));
+  assert.ok(!picker.recommended.has(3526));
+  assert.ok(ids.includes(3526));
+  picker.element = '暗系';
+  assert.ok(picker.visible().some(row => row.id === 3539));
+  picker.query = '光阵吸引';
+  assert.deepEqual(picker.visible().map(row => row.id),[3539]);
+  const cleared = new StrategyPickerModel(strategies, [], []);
+  assert.equal(cleared.recommended.size, 0);
+});
+
+test("临近推荐沿激活关系向后延伸，不按同元素或仅获取前置推荐", () => {
+  const row = (id, gradation, labels, true_pre, pre_labels=[]) => ({
+    id, gradation, labels, true_pre, pre_labels, name:String(id), description:'', category:'光系',
+  });
+  const rows = [row(1,1,[6,100],[]), row(3,3,[6,300],[200]),
+    row(4,1,[6,400],[]), row(5,4,[6,500],[400],[100]), row(2,2,[6,200],[100])];
+  const picker = new StrategyPickerModel(rows, [4], [1]);
+  assert.deepEqual(picker.visible().map(row=>row.id),[2,3,4,1,5]);
+  assert.deepEqual([...picker.recommended],[2,3,4]);
+  const changed = new StrategyPickerModel(rows, [], [2]);
+  assert.deepEqual([...changed.recommended],[3]);
+});
+
 test("自定义复制模板和继承配置，编辑与原模板隔离，完整目标不受四槽限制", () => {
   const source = new BodyEditor(2);
   source.add(3277, 4);

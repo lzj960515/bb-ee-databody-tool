@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from databody.desktop_api import DesktopAPI
+from databody import __version__
 from databody.service import DataBodyService
 from databody.save_codec import SaveDocument
 from databody.bodies import body_entries, nested, pack_from_save
@@ -48,6 +49,11 @@ class DesktopAPITests(unittest.TestCase):
                  "qualities": [4, 3], "body_quality": 3},
                 {"character_id": 102101, "strategy_ids": [2226, 2227],
                  "qualities": [3, 4], "body_quality": 4}]
+
+    def test_initial_data_exposes_running_application_version(self):
+        initial = self.api.get_initial_data()
+        self.assertTrue(initial['ok'], initial)
+        self.assertEqual(initial['data']['version'], __version__)
 
     def test_single_full_body_passes_owned_strategies_and_potentials_to_save(self):
         self.service.characters[101101]['full_potentials'] = [{'id': 6001}, {'id': 6002}]

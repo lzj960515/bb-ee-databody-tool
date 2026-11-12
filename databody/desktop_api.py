@@ -5,6 +5,7 @@ import json
 import threading
 from pathlib import Path
 
+from . import __version__
 from .body_types import BodyInheritance, BodyRequest, BodyStrategy
 from .custom_builds import CustomBuildStore
 from .planner import BuildPlanner
@@ -76,6 +77,7 @@ class DesktopAPI:
 
     def _get_initial_data(self) -> dict:
         data = self._read_initial_data()
+        data['version'] = __version__
         data["strategy_positions"] = self._get_guides().strategy_positions()
         return data
 
