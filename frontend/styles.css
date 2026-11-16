@@ -267,6 +267,11 @@ button:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.detail-actions > button {
+  white-space: nowrap;
 }
 .custom-card-heading {
   display: flex;

@@ -228,6 +228,14 @@
     state.customDrafts.set(key, draft);
     await openCustom(key);
   }
+  async function importSingleBody() {
+    const single = SingleBodyEditor.fromGuide(state.guide, editor(), state.catalog.characters);
+    guideRequests.invalidate();
+    state.single = single;
+    state.mode = "single";
+    await refreshGuide();
+    toast(`已导入 ${single.owned.length} 项策略，请选择角色和两项传出继承。`);
+  }
   async function saveCustom() {
     const draft = customDraft();
     if (draft.saving) return;
@@ -358,10 +366,13 @@
     if (state.mode !== "custom") {
       const build =
         state.guide || state.builds.find((row) => row.id === state.buildId);
-      return `<div class="detail-heading"><button class="back-button" data-action="back">‹ 返回</button><div class="detail-title"><h1>${escape(build.title)}</h1><p>${escape(build.summary)}</p></div><button class="secondary" data-action="copy-custom" ${state.guide ? "" : "disabled"}>自定义</button></div>`;
+      return `<div class="detail-heading"><button class="back-button" data-action="back">‹ 返回</button><div class="detail-title"><h1>${escape(build.title)}</h1><p>${escape(build.summary)}</p></div><div class="detail-actions">${singleImportButtonHtml()}<button class="secondary" data-action="copy-custom" ${state.guide ? "" : "disabled"}>自定义</button></div></div>`;
     }
     const draft = customDraft();
-    return `<div class="detail-heading custom-heading"><button class="back-button" data-action="back">‹ 返回</button><div class="detail-title"><input id="custom-title" class="build-title-input" aria-label="玩法名称" placeholder="玩法名称" maxlength="80" value="${escape(draft.title)}"><span id="draft-status" class="draft-state ${draft.dirty ? "unsaved" : ""}">${draftStatus(draft)}</span></div><div class="detail-actions"><button class="quiet-button" data-action="confirm-delete-custom" ${draft.saving ? "disabled" : ""}>删除</button><button class="primary" data-action="save-custom" ${draft.saving ? "disabled" : ""}>${draft.saving ? "保存中…" : "保存玩法"}</button></div></div>`;
+    return `<div class="detail-heading custom-heading"><button class="back-button" data-action="back">‹ 返回</button><div class="detail-title"><input id="custom-title" class="build-title-input" aria-label="玩法名称" placeholder="玩法名称" maxlength="80" value="${escape(draft.title)}"><span id="draft-status" class="draft-state ${draft.dirty ? "unsaved" : ""}">${draftStatus(draft)}</span></div><div class="detail-actions">${singleImportButtonHtml()}<button class="quiet-button" data-action="confirm-delete-custom" ${draft.saving ? "disabled" : ""}>删除</button><button class="primary" data-action="save-custom" ${draft.saving ? "disabled" : ""}>${draft.saving ? "保存中…" : "保存玩法"}</button></div></div>`;
+  }
+  function singleImportButtonHtml() {
+    return `<button class="secondary" data-action="import-single" title="将当前最终搭配导入为新的单体草稿" ${state.busy || !state.guide?.strategy_ids.length ? "disabled" : ""}>导入单个数据体</button>`;
   }
   function targetEditorHtml() {
     if (state.mode !== "custom") return "";
@@ -849,6 +860,7 @@
     else if (action === "open-custom") await openCustom(button.dataset.id);
     else if (action === "new-custom") await createCustom();
     else if (action === "copy-custom") await createCustom(true);
+    else if (action === "import-single") await importSingleBody();
     else if (action === "save-custom") await saveCustom();
     else if (action === "confirm-delete-custom") confirmDeleteCustom();
     else if (action === "delete-custom") await deleteCustom();

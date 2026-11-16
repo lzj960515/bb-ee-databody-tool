@@ -15,6 +15,44 @@ const characters = [
   {id: 3, base_attrs: [{type: 1, value: 800}, {type: 18, value: 120}], inherit_skills: [31, 32]},
 ];
 
+test("玩法全量导入新单体，保留已选品质，源玩法与新草稿相互独立", () => {
+  const source = new BodyEditor(2);
+  source.bodies[0].character_id = 1;
+  source.bodies[1].character_id = 2;
+  source.set(0,0,2253,2);
+  source.set(1,1,2474,3);
+  const current = {...guide([2253,2226,2227,3526,3539,2474,2253]), optional_ids:[2248]};
+  const before = JSON.stringify({current,bodies:source.bodies});
+  const single = SingleBodyEditor.fromGuide(current, source, characters);
+  assert.deepEqual(single.owned,[{id:2253,quality:2},{id:2226,quality:4},
+    {id:2227,quality:4},{id:3526,quality:4},{id:3539,quality:4},{id:2474,quality:3}]);
+  assert.deepEqual(single.bodies,[{character_id:null,body_quality:3,slots:[null,null]}]);
+  assert.deepEqual(single.attributes,{max_hp:'',max_mp:''});
+  assert.deepEqual(single.inheritances,[null,null]);
+  assert.equal(single.fullPotentials,false);
+  assert.equal(JSON.stringify({current,bodies:source.bodies}),before);
+  single.setOwned(2253,4);
+  assert.equal(source.bodies[0].slots[0].quality,2);
+  source.set(1,1,2474,1);
+  assert.equal(single.ownedQuality(2474),3);
+  single.selectCharacter(1);
+  assert.equal(single.attributeValue('max_hp'),1300);
+  single.set(0,0,2253,4); single.set(0,1,2474,3);
+  const request = single.requests(guide(single.owned.map(row=>row.id)))[0];
+  assert.equal(request.owned_strategies.length,6);
+  assert.deepEqual(request.strategy_ids,[2253,2474]);
+});
+
+test("普通获取有冲突的玩法可导入单体重新判断激活，未算完或空搭配不能导入", () => {
+  const source = new BodyEditor(2);
+  const current = guide([3539,2474]);
+  current.selection.errors=['普通获取路线无解'];
+  assert.deepEqual(SingleBodyEditor.fromGuide(current,source).owned,
+    [{id:3539,quality:4},{id:2474,quality:4}]);
+  assert.throws(()=>SingleBodyEditor.fromGuide(null,source),/计算/);
+  assert.throws(()=>SingleBodyEditor.fromGuide(guide([]),source),/策略/);
+});
+
 test("单体属性默认跟随角色，改值保留；继承技能随来源切换且不能串角色", () => {
   const single = new SingleBodyEditor(characters);
   single.selectCharacter(1);

@@ -111,6 +111,17 @@
       this.attributes = { max_hp: "", max_mp: "" };
       this.inheritances = [null, null];
     }
+    static fromGuide(guide, sourceEditor, characters = []) {
+      if (!guide) throw new Error("请等待当前搭配计算完成。");
+      if (!guide.strategy_ids.length) throw new Error("请先选择要导入的策略。");
+      const single = new SingleBodyEditor(characters);
+      const selected = sourceEditor.bodies.flatMap(body => body.slots.filter(Boolean));
+      for (const id of new Set(guide.strategy_ids)) {
+        const quality = selected.find(slot => slot.id === id)?.quality || 4;
+        single.setOwned(id, quality);
+      }
+      return single;
+    }
     selectCharacter(id) {
       this.bodies[0].character_id = id;
       this.inheritances = this.inheritances.map((row) => row?.character_id === id ? null : row);
