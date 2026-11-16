@@ -65,7 +65,7 @@ class UpdateInstallerTests(unittest.TestCase):
         plan_path = self.prepare()
         plan = json.loads(plan_path.read_text('utf8'))
         self.assertEqual(self.target.read_bytes(), b'MZoriginal program')
-        self.assertEqual(Path(plan['package']).parent, self.target.parent)
+        self.assertTrue(Path(plan['package']).parent.samefile(self.target.parent))
         self.assertEqual(Path(plan['package']).read_bytes(), b'MZnew program')
         self.assertEqual(plan['original_sha256'], file_digest(self.target))
         self.assertEqual(plan['parent_pid'], os.getpid())
