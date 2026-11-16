@@ -18,6 +18,7 @@ def main() -> None:
         background_color="#f4f5f7",
     )
     api._window = window
+    window.events.closed += api._updates.cancel
     # file:// 直接载入打包资源，不启动本地 HTTP 服务。
     webview.start(gui="edgechromium", http_server=False)
 

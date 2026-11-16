@@ -54,11 +54,14 @@
     busy: false,
     picker: null,
     confirm: null,
+    updateInfo: null,
+    updatePending: false,
   };
   const guideRequests = new GuideRequestQueue(({ method, args }) =>
     call(method, ...args),
   );
   let toastTimer;
+  let updateCheckPromise = null;
   const clean = (value) =>
     String(value ?? "").replace(/<\/?(?:color|size|b|i|u)(?:=[^>]*)?>/gi, "");
   const escape = (value) =>
@@ -114,6 +117,76 @@
     if (!response?.ok)
       throw new Error(response?.error || "操作未完成，请重试。");
     return response.data;
+  }
+  async function checkForUpdates(manual = false) {
+    if (updateCheckPromise) {
+      try { await updateCheckPromise; }
+      catch (error) { if (manual) toast(error.message, true); }
+      return;
+    }
+    const version = document.querySelector("#app-version");
+    version.dataset.status = "checking";
+    version.title = "正在检查更新…";
+    updateCheckPromise = call("check_for_updates").finally(() => { updateCheckPromise = null; });
+    try {
+      const info = await updateCheckPromise;
+      state.updateInfo = info;
+      version.dataset.status = info.available ? "available" : "current";
+      version.title = info.available ? `发现 ${info.latest_version}，点击更新` : "已是最新版本，点击重新检查";
+      if (info.available) {
+        state.updatePending = true;
+        showPendingUpdate();
+      } else if (manual) toast("当前已是最新版本。");
+    } catch (error) {
+      version.dataset.status = "failed";
+      version.title = "检查更新失败，点击重试";
+      if (manual) toast(error.message, true);
+    }
+  }
+  function showPendingUpdate() {
+    if (state.updatePending && !state.busy && !modal.open) {
+      state.updatePending = false;
+      showUpdateDialog();
+    }
+  }
+  function showUpdateDialog(error = "") {
+    const info = state.updateInfo;
+    showModal(
+      `发现新版本 ${info.latest_version}`,
+      `<p>当前版本 ${info.current_version}，新版本 ${info.latest_version}。</p>${info.notes ? `<div class="update-notes">${escape(info.notes)}</div>` : ""}<p class="confirmation-note">更新将自动下载、安装并重新打开工具。请先保存尚未保存的玩法。</p>${!info.can_install ? '<p class="feedback error">自动安装需要使用打包后的 EXE。</p>' : ""}${error ? `<p class="feedback error" role="alert">${escape(error)}</p>` : ""}`,
+      `<button class="secondary" data-action="close-modal">稍后</button><button class="primary" data-action="update-restart" ${info.can_install ? "" : "disabled"}>更新并重启</button>`,
+    );
+  }
+  async function renderUpdateProgress() {
+    const status = await call("get_update_status");
+    const progress = document.querySelector("#update-progress");
+    const text = document.querySelector("#update-progress-text");
+    if (!progress || !text) return;
+    if (status.total) progress.value = Math.min(100, status.received * 100 / status.total);
+    else progress.removeAttribute("value");
+    text.textContent = status.total
+      ? `正在下载 ${Math.round(status.received * 100 / status.total)}%`
+      : "正在连接更新服务器…";
+  }
+  async function updateAndRestart() {
+    setBusy(true);
+    showModal("正在更新", '<progress class="update-progress" id="update-progress" max="100"></progress><p id="update-progress-text">正在连接更新服务器…</p><p class="muted">下载并校验完成后将自动安装、重新打开工具。</p>');
+    modal.querySelectorAll("button").forEach(button => { button.disabled = true; });
+    let handedOff = false;
+    const progressTimer = setInterval(() => { renderUpdateProgress().catch(() => {}); }, 700);
+    try {
+      await call("prepare_update");
+      clearInterval(progressTimer);
+      document.querySelector("#update-progress-text").textContent = "正在安装并重启…";
+      await call("install_update");
+      handedOff = true;
+    } catch (error) {
+      setBusy(false);
+      showUpdateDialog(error.message);
+    } finally {
+      clearInterval(progressTimer);
+      if (!handedOff) setBusy(false);
+    }
   }
   function tags(items) {
     return items
@@ -715,6 +788,8 @@
     document
       .querySelectorAll(".save-controls button,.save-controls select")
       .forEach((element) => (element.disabled = value));
+    document.querySelector("#app-version").disabled = value;
+    if (!value) showPendingUpdate();
   }
   function updateSaveLabel() {
     const select = document.querySelector("#save-select");
@@ -846,7 +921,11 @@
   async function handleAction(button) {
     const action = button.dataset.action;
     if (state.busy && action !== "close-modal") return;
-    if (action === "mode") {
+    if (action === "check-update") {
+      if (state.updateInfo?.available) showUpdateDialog();
+      else await checkForUpdates(true);
+    } else if (action === "update-restart") await updateAndRestart();
+    else if (action === "mode") {
       state.mode = button.dataset.mode;
       state.guide = null;
       state.guideError = null;
@@ -1001,6 +1080,7 @@
       state.confirm = null;
     }
   });
+  modal.addEventListener("close", () => { queueMicrotask(showPendingUpdate); });
   let started = false;
   async function start() {
     if (started) return;
@@ -1008,7 +1088,8 @@
     try {
       const initial = await call("get_initial_data");
       document.querySelector("#app-version").textContent = initial.version;
-      document.querySelector("#app-version").title = `当前版本 ${initial.version}`;
+      document.querySelector("#app-version").title = `当前版本 ${initial.version}，点击检查更新`;
+      document.querySelector("#app-version").disabled = false;
       state.catalog = initial.catalog;
       state.single = new SingleBodyEditor(state.catalog.characters);
       state.strategyPositions = initial.strategy_positions;
@@ -1027,6 +1108,7 @@
       updateSaveLabel();
       render();
       workspace.setAttribute("aria-busy", "false");
+      if (initial.can_update) checkForUpdates();
     } catch (error) {
       workspace.innerHTML = `<section class="fatal"><h1>载入失败</h1><p>${escape(error.message)}</p><p>请关闭工具后重新打开。</p></section>`;
     }

@@ -10,14 +10,17 @@ from .body_types import BodyInheritance, BodyRequest, BodyStrategy
 from .custom_builds import CustomBuildStore
 from .planner import BuildPlanner
 from .service import DataBodyService, application_directory
+from .updates import UpdateService
 
 
 class DesktopAPI:
     def __init__(self, service: DataBodyService | None = None, *, resource_directory: Path | None = None,
-                 user_data_directory: Path | None = None):
+                 user_data_directory: Path | None = None, update_service: UpdateService | None = None):
         self._service = service or DataBodyService()
         self._resources = resource_directory or application_directory()
         self._custom_builds = CustomBuildStore(self._service.catalog, directory=user_data_directory)
+        self._updates = update_service if update_service is not None else UpdateService(
+            directory=user_data_directory / 'updates' if user_data_directory is not None else None)
         self._window = None
         self._selected_path: Path | None = None
         self._current_save: dict | None = None
@@ -27,6 +30,27 @@ class DesktopAPI:
 
     def get_initial_data(self) -> dict:
         return self._respond(self._get_initial_data)
+
+    def check_for_updates(self) -> dict:
+        return self._respond(self._updates.check)
+
+    def get_update_status(self) -> dict:
+        return self._respond(self._updates.status)
+
+    def prepare_update(self) -> dict:
+        return self._respond(self._updates.prepare)
+
+    def install_update(self) -> dict:
+        return self._respond_serialized(self._install_update)
+
+    def _install_update(self) -> dict:
+        window = self._require_window()
+        result = self._updates.install()
+        # 先让网页收到安装交接结果，再关闭主窗口释放 EXE。
+        closing = threading.Timer(0.3, window.destroy)
+        closing.daemon = True
+        closing.start()
+        return result
 
     def list_builds(self) -> dict:
         return self._respond(self._list_builds)
@@ -78,6 +102,7 @@ class DesktopAPI:
     def _get_initial_data(self) -> dict:
         data = self._read_initial_data()
         data['version'] = __version__
+        data['can_update'] = self._updates.can_install
         data["strategy_positions"] = self._get_guides().strategy_positions()
         return data
 

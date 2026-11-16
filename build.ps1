@@ -8,7 +8,7 @@ if ($env:GITHUB_REF_TYPE -eq 'tag') {
         throw '应用版本与发布标签不一致'
     }
 }
-& '.\.venv\Scripts\python.exe' -m PyInstaller --noconfirm --clean --onefile --windowed --name $Name --add-data 'data/catalog.json;data' --add-data 'data/planner_rules.json;data' --add-data 'data/builds.json;data' --add-data 'frontend;frontend' launch.py
+& '.\.venv\Scripts\python.exe' -m PyInstaller --noconfirm --clean --onefile --windowed --name $Name --add-data 'data/catalog.json;data' --add-data 'data/planner_rules.json;data' --add-data 'data/builds.json;data' --add-data 'frontend;frontend' --add-data 'databody/update_install.ps1;databody' launch.py
 if ($LASTEXITCODE -ne 0) { throw '打包失败' }
 Copy-Item -LiteralPath '.\README.md' -Destination '.\dist\使用说明.md' -Force
 New-Item -ItemType Directory -Path '.\dist\docs\images' -Force | Out-Null

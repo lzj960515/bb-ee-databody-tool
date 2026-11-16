@@ -55,6 +55,59 @@ class DesktopAPITests(unittest.TestCase):
         self.assertTrue(initial['ok'], initial)
         self.assertEqual(initial['data']['version'], __version__)
 
+    def test_update_check_does_not_hold_the_personal_save_operation_lock(self):
+        entered, release = threading.Event(), threading.Event()
+        updates = Mock(can_install=True)
+
+        def slow_check():
+            entered.set()
+            release.wait(3)
+            return {'available': True, 'latest_version': '9.0.0'}
+
+        updates.check.side_effect = slow_check
+        api = DesktopAPI(self.service, resource_directory=self.root,
+                         user_data_directory=self.personal_directory, update_service=updates)
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            checking = workers.submit(api.check_for_updates)
+            self.assertTrue(entered.wait(1))
+            try:
+                saving = workers.submit(api.save_custom_build, self.custom_draft())
+                self.assertTrue(saving.result(timeout=1)['ok'])
+            finally:
+                release.set()
+            self.assertTrue(checking.result(timeout=1)['ok'])
+        self.assertEqual(self.path.read_bytes(), self.original)
+
+    def test_update_handoff_closes_only_after_installer_is_started(self):
+        updates = Mock(can_install=True)
+        updates.install.return_value = {'started': True}
+        api = DesktopAPI(self.service, resource_directory=self.root,
+                         user_data_directory=self.personal_directory, update_service=updates)
+        api._window = self.window
+        with patch('databody.desktop_api.threading.Timer') as timer:
+            result = api.install_update()
+            self.assertTrue(result['ok'], result)
+            updates.install.assert_called_once()
+            timer.assert_called_once_with(0.3, self.window.destroy)
+            timer.return_value.start.assert_called_once()
+        updates.install.side_effect = OSError('helper unavailable')
+        with patch('databody.desktop_api.threading.Timer') as timer:
+            self.assertFalse(api.install_update()['ok'])
+            timer.assert_not_called()
+        self.window.destroy.assert_not_called()
+
+    def test_failed_update_download_preserves_window_and_game_save(self):
+        updates = Mock(can_install=True)
+        updates.prepare.side_effect = ValueError('更新文件校验失败')
+        api = DesktopAPI(self.service, resource_directory=self.root,
+                         user_data_directory=self.personal_directory, update_service=updates)
+        api._window = self.window
+        self.assertTrue(api.get_initial_data()['data']['can_update'])
+        self.assertFalse(api.prepare_update()['ok'])
+        updates.install.assert_not_called()
+        self.window.destroy.assert_not_called()
+        self.assertEqual(self.path.read_bytes(), self.original)
+
     def test_single_full_body_passes_owned_strategies_and_potentials_to_save(self):
         self.service.characters[101101]['full_potentials'] = [{'id': 6001}, {'id': 6002}]
         request = self.requests()[0]
